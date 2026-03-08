@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Page Archiver",
+  "version": "1.0.0",
+  "description": "Captures visited pages as MHTML on focus. Configurable interval and delay.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "downloads",
+    "scripting",
+    "storage",
+    "pageCapture",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

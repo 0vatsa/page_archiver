@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page Archiver</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 380px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      background: #1a1a1a;
+      color: #d0d0d0;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid #2e2e2e;
+    }
+    header h1 { font-size: 13px; font-weight: 600; color: #e8e8e8; }
+    header p  { font-size: 11px; color: #666; margin-top: 2px; }
+
+    /* ── Stats ── */
+    .stats-row {
+      display: flex;
+      border-bottom: 1px solid #2e2e2e;
+    }
+    .stat {
+      flex: 1;
+      padding: 10px 14px;
+      border-right: 1px solid #2e2e2e;
+    }
+    .stat:last-child { border-right: none; }
+    .stat .value { font-size: 18px; font-weight: 600; color: #e8e8e8; }
+    .stat .label { font-size: 10px; color: #555; margin-top: 1px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex; gap: 8px; padding: 10px 14px;
+      border-bottom: 1px solid #2e2e2e;
+    }
+    button {
+      flex: 1; padding: 7px 10px; border: 1px solid #3a3a3a;
+      background: #252525; color: #c8c8c8;
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      border-radius: 4px;
+    }
+    button:hover { background: #2e2e2e; color: #e8e8e8; }
+    button:active { background: #222; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    .btn-danger { border-color: #4a2a2a; color: #b06060; }
+    .btn-danger:hover { background: #2e1e1e; color: #c07070; }
+
+    /* ── Section label ── */
+    .section-label {
+      padding: 8px 14px 4px;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: #555;
+      border-bottom: 1px solid #2e2e2e;
+    }
+
+    /* ── Setting rows ── */
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px;
+      border-bottom: 1px solid #2e2e2e;
+    }
+    .setting-row label {
+      font-size: 12px; color: #aaa;
+    }
+    .setting-row .hint {
+      font-size: 10px; color: #555; margin-left: 6px;
+    }
+    .setting-row .right {
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* Checkbox */
+    input[type="checkbox"] {
+      width: 14px; height: 14px; cursor: pointer; accent-color: #888;
+    }
+
+    /* Number input */
+    input[type="number"] {
+      width: 52px; padding: 3px 6px;
+      background: #252525; border: 1px solid #3a3a3a;
+      color: #d0d0d0; font-size: 12px;
+      border-radius: 3px; text-align: right;
+      outline: none;
+    }
+    input[type="number"]:focus { border-color: #666; }
+    .unit { font-size: 11px; color: #555; }
+
+    /* ── Filter section ── */
+    .filter-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px; cursor: pointer; user-select: none;
+      border-bottom: 1px solid #2e2e2e;
+    }
+    .filter-header:hover { background: #202020; }
+    .filter-header span { font-size: 12px; color: #aaa; }
+    .filter-mode-tag {
+      font-size: 10px; color: #666;
+      border: 1px solid #333; border-radius: 3px;
+      padding: 1px 6px;
+    }
+    .filter-mode-tag.block { border-color: #5a2a2a; color: #a06060; }
+    .filter-mode-tag.allow { border-color: #2a5a2a; color: #60a060; }
+    .chevron { font-size: 9px; color: #555; transition: transform 0.15s; }
+    .chevron.open { transform: rotate(180deg); }
+
+    .filter-body { display: none; border-bottom: 1px solid #2e2e2e; }
+    .filter-body.open { display: block; }
+
+    .mode-tabs {
+      display: flex; gap: 0;
+      border-bottom: 1px solid #2e2e2e;
+    }
+    .mode-tab {
+      flex: 1; padding: 6px 4px; text-align: center;
+      font-size: 11px; cursor: pointer; color: #555;
+      border-right: 1px solid #2e2e2e; user-select: none;
+    }
+    .mode-tab:last-child { border-right: none; }
+    .mode-tab:hover { color: #aaa; background: #202020; }
+    .mode-tab.active { color: #d0d0d0; background: #2a2a2a; }
+
+    .site-list {
+      max-height: 120px; overflow-y: auto;
+      padding: 4px 0;
+    }
+    .site-row {
+      display: flex; align-items: center;
+      padding: 4px 14px; gap: 8px; font-size: 12px; color: #bbb;
+    }
+    .site-row:hover { background: #202020; }
+    .site-host { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stem-label {
+      font-size: 10px; padding: 1px 5px;
+      border: 1px solid #333; border-radius: 3px;
+      color: #555; cursor: pointer; user-select: none; white-space: nowrap;
+    }
+    .stem-label.active { border-color: #556; color: #99a; background: #222230; }
+    .remove-btn {
+      flex: 0; background: none; border: none; color: #555;
+      font-size: 14px; cursor: pointer; padding: 0 2px; line-height: 1;
+    }
+    .remove-btn:hover { color: #a06060; }
+    .no-sites { padding: 8px 14px; font-size: 11px; color: #555; }
+
+    .add-row {
+      display: flex; gap: 6px; padding: 8px 14px;
+      border-top: 1px solid #2e2e2e;
+    }
+    .add-row input[type="text"] {
+      flex: 1; padding: 5px 8px;
+      background: #252525; border: 1px solid #3a3a3a;
+      color: #d0d0d0; font-size: 11px; border-radius: 3px; outline: none;
+    }
+    .add-row input[type="text"]:focus { border-color: #666; }
+    .add-row input::placeholder { color: #444; }
+    .btn-add {
+      flex: 0; padding: 5px 12px; background: #2a2a2a; border: 1px solid #444;
+      color: #bbb; font-size: 11px; font-weight: 600;
+    }
+    .btn-add:hover { background: #333; color: #ddd; }
+
+    /* ── Recent pages ── */
+    .page-list {
+      max-height: 180px; overflow-y: auto;
+      padding: 4px 0;
+    }
+    .page-row {
+      padding: 5px 14px; font-size: 12px; color: #bbb;
+      border-bottom: 1px solid #252525;
+    }
+    .page-row:last-child { border-bottom: none; }
+    .page-row .title {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: #d0d0d0;
+    }
+    .page-row .meta {
+      font-size: 10px; color: #555; margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .no-pages { padding: 14px; font-size: 12px; color: #555; text-align: center; }
+
+    /* ── SQLite status ── */
+    .sqlite-status {
+      display: none; padding: 5px 14px;
+      font-size: 10px; color: #666;
+      border-bottom: 1px solid #2e2e2e;
+      background: #1e1e1e;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+      background: #333; color: #d0d0d0; border: 1px solid #444;
+      padding: 5px 14px; border-radius: 3px;
+      font-size: 11px; opacity: 0; transition: opacity 0.15s;
+      pointer-events: none; white-space: nowrap; z-index: 99;
+    }
+    .toast.show { opacity: 1; }
+
+    footer {
+      padding: 7px 14px; font-size: 10px; color: #444;
+      border-top: 1px solid #2e2e2e;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Page Archiver</h1>
+  <p id="header-sub">Captures on focus · saves as MHTML</p>
+</header>
+
+<div class="stats-row">
+  <div class="stat"><div class="value" id="stat-pages">0</div><div class="label">Pages</div></div>
+  <div class="stat"><div class="value" id="stat-snaps">0</div><div class="label">Snapshots</div></div>
+  <div class="stat"><div class="value" id="stat-mb">0</div><div class="label">MB saved</div></div>
+</div>
+
+<div class="btn-row">
+  <button id="btn-capture">Capture Now</button>
+  <button class="btn-danger" id="btn-clear">Clear DB</button>
+</div>
+
+<div class="section-label">Settings</div>
+
+<!-- Silent downloads -->
+<div class="setting-row">
+  <label for="toggle-silent">Silent downloads <span class="hint" id="silent-hint">no popup</span></label>
+  <input type="checkbox" id="toggle-silent" checked />
+</div>
+
+<!-- Capture interval -->
+<div class="setting-row">
+  <label for="input-interval">Capture interval</label>
+  <div class="right">
+    <input type="number" id="input-interval" min="1" max="1440" value="5" />
+    <span class="unit">min</span>
+  </div>
+</div>
+
+<!-- Initial delay -->
+<div class="setting-row">
+  <label for="input-delay">Initial delay</label>
+  <div class="right">
+    <input type="number" id="input-delay" min="0" max="120" value="10" />
+    <span class="unit">sec</span>
+  </div>
+</div>
+
+<!-- SQLite opt-in -->
+<div class="setting-row">
+  <label for="toggle-sqlite">Save to SQLite <span class="hint" id="db-hint">browser storage</span></label>
+  <input type="checkbox" id="toggle-sqlite" />
+</div>
+<div class="sqlite-status" id="sqlite-status"></div>
+
+<!-- Site filter -->
+<div class="filter-header" id="filter-header">
+  <span>Site filter <span class="filter-mode-tag none" id="filter-mode-badge">off</span></span>
+  <span class="chevron" id="filter-chevron">&#9660;</span>
+</div>
+<div class="filter-body" id="filter-body">
+  <div class="mode-tabs">
+    <div class="mode-tab active" data-mode="none"  id="tab-none">Off</div>
+    <div class="mode-tab"       data-mode="block" id="tab-block">Block list</div>
+    <div class="mode-tab"       data-mode="allow" id="tab-allow">Allow list</div>
+  </div>
+  <div class="site-list" id="site-list">
+    <div class="no-sites">No sites added yet.</div>
+  </div>
+  <div class="add-row">
+    <input type="text" id="site-input" placeholder="e.g. twitter.com" />
+    <button class="btn-add" id="btn-add-site">Add</button>
+  </div>
+</div>
+
+<div class="section-label">Recent Pages</div>
+<div class="page-list" id="page-list">
+  <div class="no-pages">No pages archived yet.</div>
+</div>
+
+<footer id="footer-path">Downloads saved to page-archiver/ in Downloads folder</footer>
+<div class="toast" id="toast"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>

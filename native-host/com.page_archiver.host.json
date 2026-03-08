@@ -1,0 +1,9 @@
+{
+  "name": "com.page_archiver.host",
+  "description": "Page Archiver native host — writes to SQLite",
+  "path": "__REPLACED_BY_INSTALL_SCRIPT__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__REPLACED_BY_INSTALL_SCRIPT__/"
+  ]
+}
