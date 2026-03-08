@@ -127,13 +127,23 @@ chrome.storage.local.get(['page_archiver_db'], console.log)
 
 ### Optional: SQLite
 
-When the native host is active, the same schema is written to:
+When the native host is active, the same schema is written to a real SQLite database. The default path is:
 
 ```
-~/page-archiver/archive.db
+~/Downloads/page-archiver/_sqlitedb/page_archiver.db
 ```
+
+You can set a custom path during `python3 install.py` — the installer prompts for it and writes your choice to `native-host/page_archiver_host.conf`. To change it later, edit that file:
+
+```
+db_path = /your/custom/path/archive.db
+```
+
+The host reads the config on every startup, so no reinstall is needed after changing the path.
 
 Column names use snake_case (`first_seen`, `last_seen`, `snapshot_count`, `captured_at`, `size_bytes`, `page_id`).
+
+The `snapshots` table has an `mhtml_blob` column that stores the raw MHTML bytes of each capture. This means even if you delete the `.mhtml` files from your Downloads folder, the full content is preserved in the database.
 
 Example queries:
 
@@ -150,11 +160,21 @@ FROM pages
 WHERE snapshot_count > 10
 ORDER BY snapshot_count DESC;
 
--- Total MB archived
+-- Total MB of files archived
 SELECT ROUND(SUM(size_bytes) / 1048576.0, 2) AS mb FROM snapshots;
+
+-- Total MB of MHTML blobs stored in DB
+SELECT ROUND(SUM(LENGTH(mhtml_blob)) / 1048576.0, 2) AS blob_mb
+FROM snapshots WHERE mhtml_blob IS NOT NULL;
+
+-- Extract a snapshot blob back to a file (run in Python)
+-- import sqlite3, base64
+-- conn = sqlite3.connect("page_archiver.db")
+-- row = conn.execute("SELECT mhtml_blob, filename FROM snapshots WHERE id = 1").fetchone()
+-- open("recovered.mhtml", "wb").write(row[0])
 ```
 
-Logs are written to `~/page-archiver/host.log`.
+Logs are written to `_sqlitedb/host.log` (same directory as the database).
 
 ---
 

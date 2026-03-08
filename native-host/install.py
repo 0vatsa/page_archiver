@@ -27,7 +27,13 @@ import textwrap
 
 HOST_NAME    = "com.page_archiver.host"
 HOST_SCRIPT  = "page_archiver_host.py"
+CONFIG_FILE  = "page_archiver_host.conf"
 DESCRIPTION  = "Page Archiver native host — writes to SQLite"
+
+DEFAULT_DB_PATH = os.path.join(
+    os.path.expanduser("~"), "Downloads",
+    "page-archiver", "_sqlitedb", "page_archiver.db"
+)
 
 # Native messaging host manifest directories per OS per browser
 # https://developer.chrome.com/docs/apps/nativeMessaging/#native-messaging-host-location
@@ -270,6 +276,23 @@ def uninstall(os_name, browser):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def prompt_db_path():
+    print()
+    print(f"Database path (press Enter for default):")
+    print(f"  Default: {DEFAULT_DB_PATH}")
+    val = input("Path: ").strip()
+    if not val:
+        return DEFAULT_DB_PATH
+    return os.path.expandvars(os.path.expanduser(val))
+
+def write_conf(db_path):
+    here = os.path.dirname(os.path.abspath(__file__))
+    conf_path = os.path.join(here, CONFIG_FILE)
+    with open(conf_path, "w") as f:
+        f.write(f"# Page Archiver native host config\n")
+        f.write(f"db_path = {db_path}\n")
+    return conf_path
+
 def main():
     parser = argparse.ArgumentParser(
         description="Page Archiver native host installer",
@@ -297,6 +320,9 @@ def main():
         return
 
     extension_id = prompt_extension_id()
+    db_path      = prompt_db_path()
+    conf_path    = write_conf(db_path)
+    print(f"  Config written: {conf_path}")
 
     if os_name == "Windows":
         install_windows(browser, extension_id)

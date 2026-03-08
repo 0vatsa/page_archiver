@@ -137,7 +137,9 @@ async function dbRecordSnapshot(data) {
     return sendToHost({ type: "RECORD_SNAPSHOT", ...data })
       .catch(e => console.error("[PageArchiver] Native DB write failed:", e.message));
   }
-  return localRecordSnapshot(data);
+  // chrome.storage.local doesn't store blobs — drop mhtmlBase64 for local path
+  const { mhtmlBase64, ...localData } = data;
+  return localRecordSnapshot(localData);
 }
 
 async function dbGetStats() {
@@ -242,7 +244,10 @@ async function captureAndSave(tabId, trigger = "focus") {
     state.lastCapturedAt = Date.now();
     state.url            = url;
 
-    dbRecordSnapshot({ url, title, filename, capturedAt, sizeBytes, trigger })
+    // Strip the data URL prefix to get raw base64 for DB storage
+    const mhtmlBase64 = dataUrl.split(",")[1] || "";
+
+    dbRecordSnapshot({ url, title, filename, capturedAt, sizeBytes, trigger, mhtmlBase64 })
       .catch(e => console.error("[PageArchiver] DB write failed:", e.message));
 
     console.log(`[PageArchiver] Captured (${trigger}): ${url}`);

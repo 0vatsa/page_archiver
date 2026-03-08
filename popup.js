@@ -137,7 +137,9 @@ async function applySqliteState(enabled) {
     setStatusMsg("Connecting to native host...");
     const res = await pingHost();
     if (res && res.ok) {
-      setStatusMsg(`Connected &mdash; ${escHtml(res.db)}`);
+      const stats = await new Promise(r => chrome.runtime.sendMessage({ type: "GET_STATS" }, r));
+      const blobNote = stats && stats.blob_mb > 0 ? ` | ${stats.blob_mb} MB in blobs` : "";
+      setStatusMsg(`Connected &mdash; ${escHtml(res.db)}${blobNote}`);
     } else {
       setStatusMsg(`Native host not found. Run: cd native-host &amp;&amp; bash install.sh &lt;extension-id&gt; then restart Brave.`);
       sqliteCb.checked   = false;
