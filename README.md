@@ -4,6 +4,25 @@ A Chrome/Brave extension that captures pages you visit as `.mhtml` files and log
 
 ---
 
+## Rationale — What this extension is trying to solve
+
+The web is not a library. It has no central filing system, no preservation mandate, no guarantee that anything posted today will be accessible tomorrow. Brink Lindsey put it well (https://brinklindsey.substack.com/p/the-curse-of-presentism):
+
+> [...] we have failed to construct our new online world in a way that preserves the past and renders it accessible. The internet’s great virtue is its decentralization: it’s a protocol for sharing information, but the information that’s posted and shared comes from all of us as we build and fill up the umpteen sites that now populate the World Wide Web. It’s up to us to maintain these websites, or not; there is no centralized authority in charge of indexing and preserving all that’s posted. The internet is “not a place in any reliable sense of the word,” writes [Adrienne LaFrance](https://www.theatlantic.com/technology/archive/2015/10/raiders-of-the-lost-web/409210/). “It’s not a repository. It is not a library. It is a constantly changing patchwork of perpetual nowness.”
+> The internet’s decentralization, the key to its power as a communications tool, is thus also its Achilles’ heel as a storehouse of knowledge. The main problems are now known as “content drift” and “link rot.” [Jonathan Zittrain](https://www.theatlantic.com/technology/archive/2021/06/the-internet-is-a-collective-hallucination/619320/) explains:
+> > It turns out that link rot and content drift are endemic to the web, which is both unsurprising and shockingly risky for a library that has “billions of books and no central filing system.” Imagine if libraries didn’t exist and there was only a “sharing economy” for physical books: People could register what books they happened to have at home, and then others who wanted them could visit and peruse them. It’s no surprise that such a system could fall out of date, with books no longer where they were advertised to be—especially if someone reported a book being in someone else’s home in 2015, and then an interested reader saw that 2015 report in 2021 and tried to visit the original home mentioned as holding it. That’s what we have right now on the web.
+> Which means that our whole scholarly apparatus for recording sources of information is now falling apart on a daily basis. A 2014 survey of citations in Supreme Court opinions and Harvard Law Review articles found that 50 percent of the links in court opinions since 1996, and 75 percent of the links in law review articles, were no longer operational. Meanwhile, links in more casual texts are even more ephemeral.
+
+This is not a minor inconvenience — it is a structural property of how the web works. Because the internet is decentralized, the information on it is only as permanent as whoever is paying to host it. Links rot. Pages drift. Entire domains disappear.
+
+The abundance of online information makes this worse, not better. Because so much is available instantly, it is easy to assume that whatever you need will be there when you go back for it. It usually is — until it isn't.
+
+This extension is built around a simple, deterministic guarantee: if you have visited a page, it is saved. Not a cached fragment, not a Wayback Machine snapshot from an approximate date, but the exact page as rendered in your browser at the moment you were looking at it. Every time you focus a tab, the extension checks whether enough time has passed since the last capture and, if so, saves the full page as a self-contained MHTML archive to your local disk — and optionally into a local SQLite database as a binary blob.
+
+Visited means saved. The page may disappear from the web tomorrow, the domain may lapse, the hosting bill may go unpaid — none of that affects your local copy. You are not dependent on any third-party archive service, any cloud provider, or any server remaining online. The archive is on your machine, queryable with standard tools, entirely under your control. This determinism is the point. It is a personal, local answer to the link rot and content drift that Lindsey describes — not a solution to the broader cultural problem, but a complete solution for your own browsing history.
+
+---
+
 ## How it works
 
 Whenever you switch to a tab or return to the browser window, the extension checks whether enough time has passed since that page was last captured (based on your configured interval). If yes, it waits your configured initial delay (to let the page finish loading), then captures.
