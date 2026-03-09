@@ -69,10 +69,37 @@ All settings are in the popup. Changes take effect immediately — no restart ne
 
 | Setting | Default | Description |
 |---|---|---|
-| Silent downloads | On | When on, files save directly to `Downloads/page-archiver/` with no dialog. Turn off to choose the save location each time. |
+| Silent downloads | On | When on, files save directly to `Downloads/page-archiver/` with no dialog. Turn off to choose the save location each time. For this to work, you must also disable **Ask where to save each file before downloading** in your browser's download settings (`brave://settings/downloads` or `chrome://settings/downloads`) — that browser-level setting overrides the extension. |
 | Capture interval | 5 min | Minimum time between captures of the same page. The page must be re-focused after this interval for a new capture to trigger. |
 | Initial delay | 10 sec | Time to wait after a tab is focused before capturing. Gives dynamic pages time to finish loading. Set to 0 to capture immediately. |
 | Save to SQLite | Off | When on, capture metadata is written to a real SQLite database via the native host. Requires running `install.py` first. |
+| Only archive bookmarks | Off | When on, only currently bookmarked pages are captured. When off, bookmarked pages are still always captured regardless of other filters. |
+| Ignore root pages | Off | When on, root domain pages (e.g. `example.com/`) are skipped globally. Does not apply to sites explicitly listed in the block/allow list — those use the per-site stem only toggle instead. |
+
+---
+
+## Additional capture filters
+
+### Only archive bookmarks
+
+When this toggle is on, only pages that are currently bookmarked in your browser are captured. All other filter settings (block list, allow list, ignore root pages) are bypassed — if the page is bookmarked, it is captured; if it is not bookmarked, it is skipped.
+
+When this toggle is off (the default), normal filter logic applies — but a bookmarked page is always captured regardless of any other filter. A bookmark is treated as an explicit instruction to archive, and nothing overrides it.
+
+### Ignore root pages
+
+When on, pages at the root of a domain (e.g. `example.com/`, `example.com`) are skipped globally. Subpages like `example.com/article/123` are still captured.
+
+This only applies to sites that are not explicitly listed in your block or allow list. For listed sites, the per-site **stem only** toggle takes precedence over this global setting.
+
+The interaction between all filter settings in order of precedence:
+
+1. If the page is bookmarked → always capture (overrides everything)
+2. If "only bookmarks" is on and page is not bookmarked → skip
+3. If the site is in the allow list → capture unless stem only is on and it is a root page
+4. If the site is in the block list → skip unless stem only is on and it is a subpage
+5. If the site is not in any list and "ignore root pages" is on → skip root pages, capture subpages
+6. Otherwise → capture
 
 ---
 

@@ -152,39 +152,84 @@ async function dbClear() {
   return useNativeHost ? sendToHost({ type: "CLEAR_DB" }) : localClearDB();
 }
 
-// ─── Filter check ─────────────────────────────────────────────────────────────
+// ─── Bookmark check ──────────────────────────────────────────────────────────
 
-async function isUrlAllowed(url) {
-  const { filterMode = "none", filterSites = [] } = await getSetting(["filterMode", "filterSites"]);
-  if (filterMode === "none" || !filterSites.length) return true;
+async function isBookmarked(url) {
+  return new Promise(resolve => {
+    chrome.bookmarks.search({ url }, results => {
+      resolve(results && results.length > 0);
+    });
+  });
+}
+
+// ─── Filter check ─────────────────────────────────────────────────────────────
+// Returns { allowed: bool, reason: string }
+
+async function shouldCapture(url) {
+  const {
+    filterMode      = "none",
+    filterSites     = [],
+    onlyBookmarks   = false,
+    ignoreRootPages = false,
+  } = await getSetting(["filterMode", "filterSites", "onlyBookmarks", "ignoreRootPages"]);
 
   let hostname, pathname;
   try {
     const parsed = new URL(url);
     hostname = parsed.hostname.toLowerCase();
     pathname = parsed.pathname;
-  } catch { return true; }
+  } catch { return { allowed: true }; }
 
+  const isRoot = pathname === "/" || pathname === "";
+
+  // Check if currently bookmarked
+  const bookmarked = await isBookmarked(url);
+
+  // Bookmark always wins — if bookmarked, capture unconditionally
+  if (bookmarked) return { allowed: true, reason: "bookmarked" };
+
+  // If onlyBookmarks toggle is on and page is NOT bookmarked, skip
+  if (onlyBookmarks) return { allowed: false, reason: "only-bookmarks" };
+
+  // Normalise filter site entries
   const entries = filterSites.map(e =>
     typeof e === "string"
       ? { host: e.toLowerCase(), stemOnly: false }
       : { host: e.host.toLowerCase(), stemOnly: !!e.stemOnly }
   );
 
+  // Find if this hostname is explicitly listed
+  const listed = entries.find(({ host }) =>
+    hostname === host || hostname.endsWith("." + host)
+  );
+
   if (filterMode === "allow") {
-    return entries.some(({ host }) => hostname === host || hostname.endsWith("." + host));
+    if (!listed) return { allowed: false, reason: "not-in-allowlist" };
+    // Listed in allow — stemOnly applies
+    if (listed.stemOnly && isRoot) return { allowed: false, reason: "stem-only" };
+    return { allowed: true };
   }
 
   if (filterMode === "block") {
-    const matched = entries.find(({ host }) => hostname === host || hostname.endsWith("." + host));
-    if (!matched) return true;
-    if (matched.stemOnly) {
-      return !(pathname === "/" || pathname === "");
+    if (listed) {
+      // stemOnly: block root only, allow subpages
+      if (listed.stemOnly) {
+        return isRoot
+          ? { allowed: false, reason: "stem-block" }
+          : { allowed: true };
+      }
+      return { allowed: false, reason: "blocked" };
     }
-    return false;
+    // Not explicitly listed — apply global ignoreRootPages if enabled
+    if (ignoreRootPages && isRoot) return { allowed: false, reason: "ignore-root" };
+    return { allowed: true };
   }
 
-  return true;
+  // filterMode === "none"
+  // No list active — still apply global ignoreRootPages for unlisted sites
+  if (ignoreRootPages && isRoot) return { allowed: false, reason: "ignore-root" };
+
+  return { allowed: true };
 }
 
 // ─── Core capture ─────────────────────────────────────────────────────────────
@@ -202,9 +247,10 @@ async function captureAndSave(tabId, trigger = "focus") {
     const url   = tab.url;
     const title = tab.title || "untitled";
 
-    if (!(await isUrlAllowed(url))) {
-      console.log(`[PageArchiver] Skipped (filtered): ${url}`);
-      return { success: false, filtered: true };
+    const { allowed, reason } = await shouldCapture(url);
+    if (!allowed) {
+      console.log(`[PageArchiver] Skipped (${reason}): ${url}`);
+      return { success: false, filtered: true, reason };
     }
 
     const capturedAt = new Date().toISOString();

@@ -282,3 +282,36 @@ document.getElementById("btn-clear").addEventListener("click", () => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderStats();
+
+// ── Only bookmarks toggle ─────────────────────────────────────────────────────
+
+const bookmarksCb   = document.getElementById("toggle-bookmarks");
+const bookmarksHint = document.getElementById("bookmarks-hint");
+
+getSetting(["onlyBookmarks"]).then(({ onlyBookmarks = false }) => {
+  bookmarksCb.checked    = onlyBookmarks;
+  bookmarksHint.textContent = onlyBookmarks ? "bookmarks only" : "all pages";
+});
+
+bookmarksCb.addEventListener("change", () => {
+  const v = bookmarksCb.checked;
+  setSetting({ onlyBookmarks: v });
+  notifyBackground();
+  bookmarksHint.textContent = v ? "bookmarks only" : "all pages";
+  showToast(v ? "Only archiving bookmarks" : "Archiving all pages");
+});
+
+// ── Ignore root pages toggle ──────────────────────────────────────────────────
+
+const ignoreRootCb = document.getElementById("toggle-ignore-root");
+
+getSetting(["ignoreRootPages"]).then(({ ignoreRootPages = false }) => {
+  ignoreRootCb.checked = ignoreRootPages;
+});
+
+ignoreRootCb.addEventListener("change", () => {
+  const v = ignoreRootCb.checked;
+  setSetting({ ignoreRootPages: v });
+  notifyBackground();
+  showToast(v ? "Ignoring root pages" : "Capturing root pages");
+});

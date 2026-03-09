@@ -10,7 +10,8 @@
     "scripting",
     "storage",
     "pageCapture",
-    "nativeMessaging"
+    "nativeMessaging",
+    "bookmarks"
   ],
   "host_permissions": [
     "<all_urls>"
