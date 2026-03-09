@@ -367,6 +367,38 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabState.delete(tabId);
 });
 
+// ─── Bookmark created — fast-capture the active tab if URL matches ────────────
+// When a user bookmarks a page, capture it after 1s regardless of interval.
+// We find the tab showing that URL and bypass the normal delay/interval check.
+
+chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
+  if (!bookmark.url) return;
+
+  // Find any active tab showing this URL
+  chrome.tabs.query({ url: bookmark.url }, async (tabs) => {
+    if (!tabs || !tabs.length) return;
+
+    // Prefer the currently focused tab; fall back to first match
+    const active = tabs.find(t => t.active) || tabs[0];
+    const tabId  = active.id;
+
+    // Cancel any pending delay for this tab — we're taking over
+    clearDelayTimer(tabId);
+
+    const state = getTabState(tabId);
+
+    // Schedule capture at 1s (gives the browser a moment to settle the bookmark)
+    state.delayTimer = setTimeout(async () => {
+      state.delayTimer = null;
+      await captureAndSave(tabId, "bookmark");
+      // Reset lastCapturedAt so next focus uses normal interval from this point
+      state.lastCapturedAt = Date.now();
+    }, 1000);
+
+    console.log(`[PageArchiver] Bookmark detected, fast-capture in 1s: ${bookmark.url}`);
+  });
+});
+
 // ─── Messages from popup ──────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

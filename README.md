@@ -82,9 +82,13 @@ All settings are in the popup. Changes take effect immediately — no restart ne
 
 ### Only archive bookmarks
 
-When this toggle is on, only pages that are currently bookmarked in your browser are captured. All other filter settings (block list, allow list, ignore root pages) are bypassed — if the page is bookmarked, it is captured; if it is not bookmarked, it is skipped.
+A bookmarked page is always treated as an explicit instruction to archive, and overrides all other filter settings regardless of this toggle.
 
-When this toggle is off (the default), normal filter logic applies — but a bookmarked page is always captured regardless of any other filter. A bookmark is treated as an explicit instruction to archive, and nothing overrides it.
+When this toggle is **on**, only currently bookmarked pages are captured. Non-bookmarked pages are skipped no matter what the block/allow list or other settings say.
+
+When this toggle is **off** (the default), normal filter logic applies to non-bookmarked pages — but any bookmarked page is still always captured unconditionally.
+
+**Bookmark capture delay:** when you bookmark a page for the first time, the extension detects the new bookmark and captures that page after 1 second, bypassing both the normal initial delay and the interval check. This ensures the page is archived immediately at the moment of bookmarking. Subsequent revisits to the same bookmarked page follow the normal delay and interval rules.
 
 ### Ignore root pages
 
@@ -163,7 +167,7 @@ Stored as JSON inside the browser profile. Two logical tables:
 | filename | string | path within Downloads |
 | capturedAt | ISO string | |
 | sizeBytes | number | |
-| trigger | string | `visit`, `focus`, or `manual` |
+| trigger | string | `visit`, `focus`, `manual`, or `bookmark` |
 
 To inspect from the browser console (background service worker DevTools):
 
@@ -234,6 +238,7 @@ Logs are written to `_sqlitedb/host.log` (same directory as the database).
 | `storage` | Persist settings and DB |
 | `scripting` | Inject content script for DOM-settled detection |
 | `nativeMessaging` | Talk to the SQLite host process (only used if SQLite is enabled) |
+| `bookmarks` | Archive if a page is bookmarked, override all filters |
 
 ---
 
