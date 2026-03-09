@@ -29,11 +29,21 @@ async function getConfig() {
 // Tracks when each tab was last captured and any pending delay timer.
 
 const tabState = new Map();
-// tabState[tabId] = { lastCapturedAt: timestamp|null, delayTimer: timeoutId|null, url: string }
+// tabState[tabId] = {
+//   lastCapturedAt: timestamp|null,
+//   delayTimer: timeoutId|null,
+//   url: string|null,
+//   skipUntil: timestamp|null,   // suppress auto-capture until this time (used after bookmark)
+// }
 
 function getTabState(tabId) {
   if (!tabState.has(tabId)) {
-    tabState.set(tabId, { lastCapturedAt: null, delayTimer: null, url: null });
+    tabState.set(tabId, {
+      lastCapturedAt: null,
+      delayTimer: null,
+      url: null,
+      skipUntil: null,
+    });
   }
   return tabState.get(tabId);
 }
@@ -326,9 +336,17 @@ async function onTabFocused(tabId) {
   clearDelayTimer(tabId);
 
   // Decide if enough time has passed since last capture of this tab
-  const now          = Date.now();
-  const lastAt       = state.lastCapturedAt;
-  const urlChanged   = state.url !== tab.url;
+  const now        = Date.now();
+  const lastAt     = state.lastCapturedAt;
+  const urlChanged = state.url !== tab.url;
+
+  // If we've just done a bookmark-based capture and are still within the
+  // suppression window, skip automatic focus/visit captures for this URL.
+  if (!urlChanged && state.skipUntil && now < state.skipUntil) {
+    console.log(`[PageArchiver] Skipped (recent bookmark capture): ${tab.url}`);
+    return;
+  }
+
   const intervalElapsed = !lastAt || (now - lastAt) >= intervalMs;
 
   if (!intervalElapsed && !urlChanged) {
@@ -399,6 +417,12 @@ chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
       await captureAndSave(tabId, "bookmark");
       // Reset lastCapturedAt so next focus uses normal interval from this point
       state.lastCapturedAt = Date.now();
+
+      // Also suppress further automatic captures (focus/visit) for this URL
+      // until the normal interval has elapsed, to avoid back-to-back captures
+      // (bookmark + visit) for the same page.
+      const { intervalMs } = await getConfig();
+      state.skipUntil = Date.now() + intervalMs;
     } catch (e) {
       console.error("[PageArchiver] Bookmark capture failed:", e);
     }
