@@ -247,10 +247,14 @@ async function captureAndSave(tabId, trigger = "focus") {
     const url   = tab.url;
     const title = tab.title || "untitled";
 
-    const { allowed, reason } = await shouldCapture(url);
-    if (!allowed) {
-      console.log(`[PageArchiver] Skipped (${reason}): ${url}`);
-      return { success: false, filtered: true, reason };
+    // Bookmark trigger bypasses shouldCapture — we already know it's a bookmark
+    // and the onCreated event may fire before chrome.bookmarks.search reflects it.
+    if (trigger !== "bookmark") {
+      const { allowed, reason } = await shouldCapture(url);
+      if (!allowed) {
+        console.log(`[PageArchiver] Skipped (${reason}): ${url}`);
+        return { success: false, filtered: true, reason };
+      }
     }
 
     const capturedAt = new Date().toISOString();
