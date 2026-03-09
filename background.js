@@ -391,15 +391,17 @@ chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
 
     const state = getTabState(tabId);
 
-    // Schedule capture at 1s (gives the browser a moment to settle the bookmark)
-    state.delayTimer = setTimeout(async () => {
-      state.delayTimer = null;
+    // Perform the capture immediately. Running this directly inside the
+    // async listener avoids relying on a later timer firing after the
+    // service worker has been torn down.
+    try {
+      console.log(`[PageArchiver] Bookmark detected, capturing now: ${bookmark.url}`);
       await captureAndSave(tabId, "bookmark");
       // Reset lastCapturedAt so next focus uses normal interval from this point
       state.lastCapturedAt = Date.now();
-    }, 1000);
-
-    console.log(`[PageArchiver] Bookmark detected, fast-capture in 1s: ${bookmark.url}`);
+    } catch (e) {
+      console.error("[PageArchiver] Bookmark capture failed:", e);
+    }
   });
 });
 
