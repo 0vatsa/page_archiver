@@ -26,23 +26,27 @@ async function getConfig() {
 }
 
 // ─── Per-tab state ────────────────────────────────────────────────────────────
-// Tracks when each tab was last captured and any pending delay timer.
+// Tracks capture timing per URL within each tab, plus any pending delay timer.
+// This lets us treat navigations like example.com → example.com/post/1 →
+// example.com independently, so revisiting the same URL before its interval
+// has elapsed does NOT trigger a new capture, even if other pages were visited
+// in between.
 
 const tabState = new Map();
 // tabState[tabId] = {
-//   lastCapturedAt: timestamp|null,
+//   lastCapturedAtByUrl: { [url: string]: timestamp },
 //   delayTimer: timeoutId|null,
-//   url: string|null,
-//   skipUntil: timestamp|null,   // suppress auto-capture until this time (used after bookmark)
+//   url: string|null,                 // last URL we captured / scheduled for
+//   skipUntilByUrl: { [url: string]: timestamp }, // per-URL suppression after bookmark captures
 // }
 
 function getTabState(tabId) {
   if (!tabState.has(tabId)) {
     tabState.set(tabId, {
-      lastCapturedAt: null,
+      lastCapturedAtByUrl: Object.create(null),
       delayTimer: null,
       url: null,
-      skipUntil: null,
+      skipUntilByUrl: Object.create(null),
     });
   }
   return tabState.get(tabId);
@@ -299,10 +303,11 @@ async function captureAndSave(tabId, trigger = "focus") {
       );
     });
 
-    // Update last captured time for this tab
+    // Update last captured time for this URL in this tab
     const state = getTabState(tabId);
-    state.lastCapturedAt = Date.now();
-    state.url            = url;
+    const nowTs = Date.now();
+    state.lastCapturedAtByUrl[url] = nowTs;
+    state.url                      = url;
 
     // Strip the data URL prefix to get raw base64 for DB storage
     const mhtmlBase64 = dataUrl.split(",")[1] || "";
@@ -335,22 +340,23 @@ async function onTabFocused(tabId) {
   // Cancel any existing pending delay for this tab
   clearDelayTimer(tabId);
 
-  // Decide if enough time has passed since last capture of this tab
   const now        = Date.now();
-  const lastAt     = state.lastCapturedAt;
-  const urlChanged = state.url !== tab.url;
+  const currentUrl = tab.url;
+  const urlChanged = state.url !== currentUrl;
 
-  // If we've just done a bookmark-based capture and are still within the
-  // suppression window, skip automatic focus/visit captures for this URL.
-  if (!urlChanged && state.skipUntil && now < state.skipUntil) {
-    console.log(`[PageArchiver] Skipped (recent bookmark capture): ${tab.url}`);
+  // Per-URL suppression window after bookmark-based captures
+  const skipUntil = state.skipUntilByUrl[currentUrl] || null;
+  if (skipUntil && now < skipUntil) {
+    console.log(`[PageArchiver] Skipped (recent bookmark capture): ${currentUrl}`);
     return;
   }
 
-  const intervalElapsed = !lastAt || (now - lastAt) >= intervalMs;
+  // Decide if enough time has passed since the last capture of THIS URL in this tab.
+  const lastAtForUrl   = state.lastCapturedAtByUrl[currentUrl] || null;
+  const intervalElapsed = !lastAtForUrl || (now - lastAtForUrl) >= intervalMs;
 
-  if (!intervalElapsed && !urlChanged) {
-    console.log(`[PageArchiver] Skipped (interval not elapsed): ${tab.url}`);
+  if (!intervalElapsed) {
+    console.log(`[PageArchiver] Skipped (interval not elapsed for URL): ${currentUrl}`);
     return;
   }
 
@@ -415,14 +421,15 @@ chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
     try {
       console.log(`[PageArchiver] Bookmark detected, capturing now: ${bookmark.url}`);
       await captureAndSave(tabId, "bookmark");
-      // Reset lastCapturedAt so next focus uses normal interval from this point
-      state.lastCapturedAt = Date.now();
 
-      // Also suppress further automatic captures (focus/visit) for this URL
-      // until the normal interval has elapsed, to avoid back-to-back captures
-      // (bookmark + visit) for the same page.
+      // Reset last-captured time for this URL so the next focus uses the normal
+      // interval from this point, and suppress further automatic captures
+      // (focus/visit) for this specific URL in this tab until the interval has
+      // elapsed. This avoids back-to-back captures (bookmark + visit).
       const { intervalMs } = await getConfig();
-      state.skipUntil = Date.now() + intervalMs;
+      const nowTs          = Date.now();
+      state.lastCapturedAtByUrl[bookmark.url] = nowTs;
+      state.skipUntilByUrl[bookmark.url]      = nowTs + intervalMs;
     } catch (e) {
       console.error("[PageArchiver] Bookmark capture failed:", e);
     }
