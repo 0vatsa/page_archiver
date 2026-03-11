@@ -60,6 +60,21 @@ function clearDelayTimer(tabId) {
   }
 }
 
+// ─── Notifications ─────────────────────────────────────────────────────────────
+
+function notify(title, message) {
+  try {
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: "icons/icon.png",
+      title,
+      message,
+    });
+  } catch (e) {
+    console.warn("[PageArchiver] Notification failed:", e);
+  }
+}
+
 // ─── Native messaging ─────────────────────────────────────────────────────────
 
 function sendToHost(msg) {
@@ -174,6 +189,40 @@ async function isBookmarked(url) {
       resolve(results && results.length > 0);
     });
   });
+}
+
+// ─── GitHub bookmark auto-clone ───────────────────────────────────────────────
+
+function isGithubRepoUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "github.com") return false;
+    const parts = u.pathname.split("/").filter(Boolean);
+    return parts.length >= 2;
+  } catch {
+    return false;
+  }
+}
+
+async function maybeCloneGithubRepo(url) {
+  if (!isGithubRepoUrl(url)) return;
+
+  const { cloneGithubRepos = false } = await getSetting(["cloneGithubRepos"]);
+  if (!cloneGithubRepos) return;
+
+  try {
+    const res = await sendToHost({ type: "GITHUB_CLONE", url });
+    if (!res || !res.ok) {
+      const msg = res && res.error ? res.error : "Unknown error";
+      notify("Page Archiver · Git clone failed", msg);
+    } else if (res.alreadyCloned) {
+      notify("Page Archiver · Repo already cloned", res.path || "Already present");
+    } else {
+      notify("Page Archiver · Repo cloned", res.path || "Clone completed");
+    }
+  } catch (e) {
+    notify("Page Archiver · Native host error", e.message || String(e));
+  }
 }
 
 // ─── Filter check ─────────────────────────────────────────────────────────────
@@ -401,6 +450,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
   if (!bookmark.url) return;
+
+  // Optionally auto-clone GitHub repos when bookmarked
+  try {
+    await maybeCloneGithubRepo(bookmark.url);
+  } catch (e) {
+    console.error("[PageArchiver] GitHub auto-clone error:", e);
+  }
 
   // Find any active tab showing this URL
   chrome.tabs.query({ url: bookmark.url }, async (tabs) => {

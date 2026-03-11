@@ -315,3 +315,18 @@ ignoreRootCb.addEventListener("change", () => {
   notifyBackground();
   showToast(v ? "Ignoring root pages" : "Capturing root pages");
 });
+
+// ── GitHub auto-clone toggle ───────────────────────────────────────────────────
+
+const githubCloneCb = document.getElementById("toggle-github-clone");
+
+getSetting(["cloneGithubRepos"]).then(({ cloneGithubRepos = false }) => {
+  githubCloneCb.checked = cloneGithubRepos;
+});
+
+githubCloneCb.addEventListener("change", () => {
+  const v = githubCloneCb.checked;
+  setSetting({ cloneGithubRepos: v });
+  notifyBackground();
+  showToast(v ? "GitHub auto-clone on" : "GitHub auto-clone off");
+});

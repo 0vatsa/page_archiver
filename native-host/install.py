@@ -35,6 +35,11 @@ DEFAULT_DB_PATH = os.path.join(
     "page-archiver", "_sqlitedb", "page_archiver.db"
 )
 
+DEFAULT_GITHUB_REPOS_DIR = os.path.join(
+    os.path.expanduser("~"), "Downloads",
+    "page-archiver", "github_repos"
+)
+
 # Native messaging host manifest directories per OS per browser
 # https://developer.chrome.com/docs/apps/nativeMessaging/#native-messaging-host-location
 NM_DIRS = {
@@ -285,12 +290,22 @@ def prompt_db_path():
         return DEFAULT_DB_PATH
     return os.path.expandvars(os.path.expanduser(val))
 
-def write_conf(db_path):
+def prompt_github_dir():
+    print()
+    print("GitHub clone directory (press Enter for default):")
+    print(f"  Default: {DEFAULT_GITHUB_REPOS_DIR}")
+    val = input("Path: ").strip()
+    if not val:
+        return DEFAULT_GITHUB_REPOS_DIR
+    return os.path.expandvars(os.path.expanduser(val))
+
+def write_conf(db_path, github_dir):
     here = os.path.dirname(os.path.abspath(__file__))
     conf_path = os.path.join(here, CONFIG_FILE)
     with open(conf_path, "w") as f:
         f.write(f"# Page Archiver native host config\n")
         f.write(f"db_path = {db_path}\n")
+        f.write(f"github_repos_dir = {github_dir}\n")
     return conf_path
 
 def main():
@@ -321,7 +336,8 @@ def main():
 
     extension_id = prompt_extension_id()
     db_path      = prompt_db_path()
-    conf_path    = write_conf(db_path)
+    github_dir   = prompt_github_dir()
+    conf_path    = write_conf(db_path, github_dir)
     print(f"  Config written: {conf_path}")
 
     if os_name == "Windows":

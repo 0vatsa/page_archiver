@@ -13,7 +13,9 @@ import sqlite3
 import os
 import base64
 import logging
+import subprocess
 from datetime import datetime
+from urllib.parse import urlparse
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -21,27 +23,46 @@ SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH  = os.path.join(SCRIPT_DIR, "page_archiver_host.conf")
 
 def load_config():
-    """Read DB path from .conf file. Falls back to default if missing."""
+    """
+    Read DB path and GitHub clone directory from .conf file.
+    Falls back to sensible defaults if missing.
+    """
+    home = os.path.expanduser("~")
     default_db = os.path.join(
-        os.path.expanduser("~"), "Downloads",
+        home, "Downloads",
         "page-archiver", "_sqlitedb", "page_archiver.db"
     )
-    if not os.path.isfile(CONFIG_PATH):
-        return default_db
-    try:
-        with open(CONFIG_PATH) as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("db_path"):
-                    _, _, val = line.partition("=")
-                    val = val.strip().strip('"').strip("'")
-                    if val:
-                        return os.path.expandvars(os.path.expanduser(val))
-    except Exception:
-        pass
-    return default_db
+    default_github_dir = os.path.join(
+        home, "Downloads",
+        "page-archiver", "github_repos"
+    )
 
-DB_PATH  = load_config()
+    db_path = default_db
+    github_dir = default_github_dir
+
+    if os.path.isfile(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    key, _, val = line.partition("=")
+                    key = key.strip()
+                    val = val.strip().strip('"').strip("'")
+                    if not val:
+                        continue
+                    if key == "db_path":
+                        db_path = os.path.expandvars(os.path.expanduser(val))
+                    elif key == "github_repos_dir":
+                        github_dir = os.path.expandvars(os.path.expanduser(val))
+        except Exception:
+            # Fall back to defaults if config parsing fails
+            pass
+
+    return db_path, github_dir
+
+DB_PATH, GITHUB_REPOS_DIR = load_config()
 DB_DIR   = os.path.dirname(DB_PATH)
 LOG_PATH = os.path.join(DB_DIR, "host.log")
 
@@ -186,6 +207,100 @@ def export_mhtml(snapshot_id):
         "mhtml_b64": base64.b64encode(row["mhtml_blob"]).decode("ascii"),
     }
 
+# ── GitHub auto-clone ──────────────────────────────────────────────────────────
+
+def _parse_github_repo(url: str):
+    """
+    Given a GitHub URL, return (owner, repo).
+
+    Accepts URLs like:
+      https://github.com/owner/repo
+      https://github.com/owner/repo/
+      https://github.com/owner/repo/issues/123
+    """
+    parsed = urlparse(url)
+    if parsed.netloc.lower() != "github.com":
+        raise ValueError("Not a github.com URL")
+
+    parts = [p for p in parsed.path.split("/") if p]
+    if len(parts) < 2:
+        raise ValueError("URL does not look like a GitHub repository")
+
+    owner, repo = parts[0], parts[1]
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    return owner, repo
+
+
+def clone_github_repo(url: str, base_dir: str):
+    """
+    Clone a GitHub repository into a user-specified base directory.
+
+    Message payload (type = GITHUB_CLONE):
+      {
+        "type": "GITHUB_CLONE",
+        "url": "https://github.com/owner/repo",
+        "targetDir": "/absolute/path/where/to/clone"
+      }
+    """
+    try:
+        owner, repo = _parse_github_repo(url)
+    except ValueError as e:
+        logging.warning(f"GITHUB_CLONE invalid URL '{url}': {e}")
+        return {"ok": False, "error": str(e)}
+
+    # If no base_dir provided by the caller, fall back to configured default.
+    if not base_dir:
+        base_dir = GITHUB_REPOS_DIR
+
+    base_dir = os.path.expanduser(base_dir)
+    base_dir = os.path.abspath(base_dir)
+
+    try:
+        os.makedirs(base_dir, exist_ok=True)
+    except Exception as e:
+        logging.exception(f"GITHUB_CLONE could not create base_dir '{base_dir}'")
+        return {"ok": False, "error": f"Could not create directory: {e}"}
+
+    dest_dir = os.path.join(base_dir, f"{owner}__{repo}")
+
+    if os.path.isdir(dest_dir) and os.listdir(dest_dir):
+        # Already cloned (or directory not empty) — don't reclone.
+        logging.info(f"GITHUB_CLONE skipped, already exists: {dest_dir}")
+        return {"ok": True, "alreadyCloned": True, "path": dest_dir}
+
+    clone_url = f"https://github.com/{owner}/{repo}.git"
+    logging.info(f"GITHUB_CLONE starting: {clone_url} -> {dest_dir}")
+
+    try:
+        proc = subprocess.run(
+            ["git", "clone", "--depth=1", clone_url, dest_dir],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except FileNotFoundError:
+        logging.exception("GITHUB_CLONE failed: git executable not found")
+        return {"ok": False, "error": "git is not installed or not in PATH"}
+    except Exception as e:
+        logging.exception("GITHUB_CLONE failed to start git")
+        return {"ok": False, "error": f"Failed to start git: {e}"}
+
+    if proc.returncode != 0:
+        logging.error(
+            f"GITHUB_CLONE git clone failed ({proc.returncode}) "
+            f"for {clone_url}: {proc.stderr.strip()}"
+        )
+        return {
+            "ok": False,
+            "error": "git clone failed",
+            "code": proc.returncode,
+            "stderr": proc.stderr,
+        }
+
+    logging.info(f"GITHUB_CLONE success: {clone_url} -> {dest_dir}")
+    return {"ok": True, "path": dest_dir}
+
 # ── Native Messaging I/O ──────────────────────────────────────────────────────
 
 def read_message():
@@ -225,6 +340,11 @@ def handle(msg):
             return export_mhtml(msg["snapshot_id"])
         elif t == "PING":
             return {"ok": True, "db": DB_PATH}
+        elif t == "GITHUB_CLONE":
+            return clone_github_repo(
+                url=msg["url"],
+                base_dir=msg.get("targetDir", ""),
+            )
         else:
             return {"ok": False, "error": f"Unknown type: {t}"}
     except Exception as e:
