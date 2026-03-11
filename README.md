@@ -45,22 +45,27 @@ This means:
 3. Click **Load unpacked** and select the `page-archiver/` folder
 4. Note your **Extension ID** — the 32-character string shown under the extension name
 
-### 2. Optional: SQLite native host
+### 2. Optional: SQLite native host + GitHub auto-clone
 
-By default the extension stores its log in `chrome.storage.local` (a browser-internal JSON store). If you want a real SQLite database you can query with standard tools, install the native host:
+By default the extension stores its log in `chrome.storage.local` (a browser-internal JSON store). If you want a real SQLite database you can query with standard tools — and optionally auto-clone bookmarked GitHub repositories via `git` — install the native host:
 
 ```
 cd native-host
 python3 install.py
 ```
 
-The installer auto-detects your OS (Linux, macOS, Windows) and browser (Chrome, Brave), prompts for your extension ID, and registers the host. To uninstall:
+The installer auto-detects your OS (Linux, macOS, Windows) and browser (Chrome, Brave), prompts for your extension ID, **SQLite DB path**, and **GitHub clone directory**, and registers the host. To uninstall:
 
 ```
 python3 install.py --uninstall
 ```
 
-After installing the native host, open the extension popup and toggle **Save to SQLite** on. The popup will confirm the connection and show the path to your `.db` file.
+After installing the native host:
+
+- Open the extension popup and toggle **Save to SQLite** on. The popup will confirm the connection and show the path to your `.db` file.
+- Optionally toggle **Clone bookmarked GitHub repos** on to enable automatic `git clone` whenever you bookmark a GitHub repository.
+
+GitHub repositories are cloned into the directory you chose during `install.py` (default: `~/Downloads/page-archiver/github_repos`). Each repo is placed in a subfolder named `<owner>__<repo>`. If a repo has already been cloned, bookmarking it again will not reclone it; you’ll get a notification that it already exists.
 
 ---
 
@@ -76,6 +81,7 @@ All settings are in the popup. Changes take effect immediately — no restart ne
 | Save to SQLite | Off | When on, capture metadata is written to a real SQLite database via the native host. Requires running `install.py` first. |
 | Only archive bookmarks | Off | When on, only currently bookmarked pages are captured. When off, bookmarked pages are still always captured regardless of other filters. |
 | Ignore root pages | Off | When on, root domain pages (e.g. `example.com/`) are skipped globally. Does not apply to sites explicitly listed in the block/allow list — those use the per-site stem only toggle instead. |
+| Clone bookmarked GitHub repos | Off | When on, bookmarking a `github.com/owner/repo` URL automatically asks the native host to `git clone` that repository into your configured clone directory. Requires the native host to be installed and `git` available on your PATH. |
 
 ---
 
@@ -239,7 +245,8 @@ Logs are written to `_sqlitedb/host.log` (same directory as the database).
 | `storage` | Persist settings and DB |
 | `scripting` | Inject content script for DOM-settled detection |
 | `nativeMessaging` | Talk to the SQLite host process (only used if SQLite is enabled) |
-| `bookmarks` | Archive if a page is bookmarked, override all filters |
+| `bookmarks` | Archive if a page is bookmarked, override all filters, and (optionally) trigger GitHub repo cloning when a repo URL is bookmarked |
+| `notifications` | Show success/failure notifications for captures and GitHub clone operations |
 
 ---
 
