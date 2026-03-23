@@ -79,7 +79,7 @@ All settings are in the popup. Changes take effect immediately — no restart ne
 | Capture interval | 5 min | Minimum time between captures of the same URL **per tab**. That URL must be focused again after this interval in a given tab for a new capture to trigger; visiting other URLs in between does not reset its timer. |
 | Initial delay | 10 sec | Time to wait after a tab is focused before capturing. Gives dynamic pages time to finish loading. Set to 0 to capture immediately. |
 | Save to SQLite | Off | When on, capture metadata is written to a real SQLite database via the native host. Requires running `install.py` first. |
-| Only archive bookmarks | Off | When on, only currently bookmarked pages are captured. When off, bookmarked pages are still always captured regardless of other filters. |
+| Only archive bookmarks | Off | When on, only currently bookmarked pages are eligible for capture. Bookmarked pages still follow the active site filter and root-page rules. |
 | Ignore root pages | Off | When on, root domain pages (e.g. `example.com/`) are skipped globally. Does not apply to sites explicitly listed in the block/allow list — those use the per-site stem only toggle instead. |
 | Clone bookmarked GitHub repos | Off | When on, bookmarking a `github.com/owner/repo` URL automatically asks the native host to `git clone` that repository into your configured clone directory. Requires the native host to be installed and `git` available on your PATH. |
 
@@ -89,11 +89,11 @@ All settings are in the popup. Changes take effect immediately — no restart ne
 
 ### Only archive bookmarks
 
-A bookmarked page is always treated as an explicit instruction to archive, and overrides all other filter settings regardless of this toggle.
+When this toggle is **on**, only currently bookmarked pages are eligible for capture. Non-bookmarked pages are skipped.
 
-When this toggle is **on**, only currently bookmarked pages are captured. Non-bookmarked pages are skipped no matter what the block/allow list or other settings say.
+When this toggle is **off** (the default), both bookmarked and non-bookmarked pages are eligible for capture.
 
-When this toggle is **off** (the default), normal filter logic applies to non-bookmarked pages — but any bookmarked page is still always captured unconditionally.
+In both cases, bookmarked pages still follow your active filter mode (off/block/allow), per-site stem-only behavior, and global root-page handling.
 
 **Bookmark capture delay:** when you bookmark a page for the first time, the extension detects the new bookmark and captures that page after 1 second, bypassing both the normal initial delay and the interval check. This ensures the page is archived immediately at the moment of bookmarking. Subsequent revisits to the same bookmarked page follow the normal delay and interval rules.
 
@@ -105,12 +105,11 @@ This only applies to sites that are not explicitly listed in your block or allow
 
 The interaction between all filter settings in order of precedence:
 
-1. If the page is bookmarked → always capture (overrides everything)
-2. If "only bookmarks" is on and page is not bookmarked → skip
-3. If the site is in the allow list → capture unless stem only is on and it is a root page
-4. If the site is in the block list → skip unless stem only is on and it is a subpage
-5. If the site is not in any list and "ignore root pages" is on → skip root pages, capture subpages
-6. Otherwise → capture
+1. If "only bookmarks" is on and page is not bookmarked → skip
+2. If the site is in the allow list → capture unless stem only is on and it is a root page
+3. If the site is in the block list → skip unless stem only is on and it is a subpage
+4. If the site is not in any list and "ignore root pages" is on → skip root pages, capture subpages
+5. Otherwise → capture
 
 ---
 
@@ -245,7 +244,7 @@ Logs are written to `_sqlitedb/host.log` (same directory as the database).
 | `storage` | Persist settings and DB |
 | `scripting` | Inject content script for DOM-settled detection |
 | `nativeMessaging` | Talk to the SQLite host process (only used if SQLite is enabled) |
-| `bookmarks` | Archive if a page is bookmarked, override all filters, and (optionally) trigger GitHub repo cloning when a repo URL is bookmarked |
+| `bookmarks` | Check whether pages are bookmarked for the "only bookmarks" filter, and (optionally) trigger GitHub repo cloning when a repo URL is bookmarked |
 | `notifications` | Show success/failure notifications for captures and GitHub clone operations |
 
 ---

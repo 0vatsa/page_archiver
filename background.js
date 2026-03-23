@@ -228,7 +228,7 @@ async function maybeCloneGithubRepo(url) {
 // ─── Filter check ─────────────────────────────────────────────────────────────
 // Returns { allowed: bool, reason: string }
 
-async function shouldCapture(url) {
+async function shouldCapture(url, options = {}) {
   const {
     filterMode      = "none",
     filterSites     = [],
@@ -245,14 +245,14 @@ async function shouldCapture(url) {
 
   const isRoot = pathname === "/" || pathname === "";
 
-  // Check if currently bookmarked
-  const bookmarked = await isBookmarked(url);
-
-  // Bookmark always wins — if bookmarked, capture unconditionally
-  if (bookmarked) return { allowed: true, reason: "bookmarked" };
+  // Check if currently bookmarked. For immediate bookmark events, we can trust
+  // the event payload even if chrome.bookmarks.search has not indexed yet.
+  const bookmarked = options.bookmarkedOverride === true
+    ? true
+    : await isBookmarked(url);
 
   // If onlyBookmarks toggle is on and page is NOT bookmarked, skip
-  if (onlyBookmarks) return { allowed: false, reason: "only-bookmarks" };
+  if (onlyBookmarks && !bookmarked) return { allowed: false, reason: "only-bookmarks" };
 
   // Normalise filter site entries
   const entries = filterSites.map(e =>
@@ -310,14 +310,12 @@ async function captureAndSave(tabId, trigger = "focus") {
     const url   = tab.url;
     const title = tab.title || "untitled";
 
-    // Bookmark trigger bypasses shouldCapture — we already know it's a bookmark
-    // and the onCreated event may fire before chrome.bookmarks.search reflects it.
-    if (trigger !== "bookmark") {
-      const { allowed, reason } = await shouldCapture(url);
-      if (!allowed) {
-        console.log(`[PageArchiver] Skipped (${reason}): ${url}`);
-        return { success: false, filtered: true, reason };
-      }
+    const { allowed, reason } = await shouldCapture(url, {
+      bookmarkedOverride: trigger === "bookmark",
+    });
+    if (!allowed) {
+      console.log(`[PageArchiver] Skipped (${reason}): ${url}`);
+      return { success: false, filtered: true, reason };
     }
 
     const capturedAt = new Date().toISOString();
