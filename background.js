@@ -2,11 +2,11 @@
 //
 // Capture strategy:
 //   - When a tab becomes active AND visible (user switches to it or comes back
-//     to the window), check if enough time has passed since the last capture
-//     for that tab. If yes, wait initialDelay seconds then capture.
+//     to the window), check whether enough active viewing time has accumulated
+//     for that URL in that tab. If yes, wait initialDelay seconds then capture.
 //   - No periodic alarms. Captures only happen when the user is actually on
-//     the page, and only if the configured interval has elapsed since the
-//     last capture of that URL.
+//     the page, and only if the configured active-time interval has elapsed
+//     for that URL.
 
 const HOST_NAME = "com.page_archiver.host";
 
@@ -29,8 +29,8 @@ async function getConfig() {
 // Tracks capture timing per URL within each tab, plus any pending delay timer.
 // This lets us treat navigations like example.com → example.com/post/1 →
 // example.com independently, so revisiting the same URL before its interval
-// has elapsed does NOT trigger a new capture, even if other pages were visited
-// in between.
+// of active viewing time has elapsed does NOT trigger a new capture, even if
+// other pages were visited in between.
 
 const tabState = new Map();
 // tabState[tabId] = {
@@ -38,6 +38,9 @@ const tabState = new Map();
 //   delayTimer: timeoutId|null,
 //   url: string|null,                 // last URL we captured / scheduled for
 //   skipUntilByUrl: { [url: string]: timestamp }, // per-URL suppression after bookmark captures
+//   activeUrl: string|null,           // URL currently being actively viewed in this tab
+//   activeSince: number|null,         // timestamp when active viewing started
+//   activeMsByUrl: { [url: string]: number }, // accumulated active-view time since last capture
 // }
 
 function getTabState(tabId) {
@@ -47,6 +50,9 @@ function getTabState(tabId) {
       delayTimer: null,
       url: null,
       skipUntilByUrl: Object.create(null),
+      activeUrl: null,
+      activeSince: null,
+      activeMsByUrl: Object.create(null),
     });
   }
   return tabState.get(tabId);
@@ -58,6 +64,44 @@ function clearDelayTimer(tabId) {
     clearTimeout(s.delayTimer);
     s.delayTimer = null;
   }
+}
+
+function urlsEquivalent(a, b) {
+  try {
+    const ua = new URL(a);
+    const ub = new URL(b);
+    const normPathA = ua.pathname === "/" ? "" : ua.pathname;
+    const normPathB = ub.pathname === "/" ? "" : ub.pathname;
+    return (
+      ua.protocol === ub.protocol &&
+      ua.hostname === ub.hostname &&
+      ua.port === ub.port &&
+      normPathA === normPathB &&
+      ua.search === ub.search
+    );
+  } catch {
+    return a === b;
+  }
+}
+
+function flushActiveTime(tabId, nowTs = Date.now()) {
+  const state = tabState.get(tabId);
+  if (!state || !state.activeUrl || !state.activeSince) return;
+
+  const delta = Math.max(0, nowTs - state.activeSince);
+  state.activeMsByUrl[state.activeUrl] = (state.activeMsByUrl[state.activeUrl] || 0) + delta;
+  state.activeSince = null;
+}
+
+function beginActiveTime(tabId, url, nowTs = Date.now()) {
+  const state = getTabState(tabId);
+
+  if (state.activeUrl && state.activeSince) {
+    flushActiveTime(tabId, nowTs);
+  }
+
+  state.activeUrl = url;
+  state.activeSince = nowTs;
 }
 
 // ─── Notifications ─────────────────────────────────────────────────────────────
@@ -355,6 +399,11 @@ async function captureAndSave(tabId, trigger = "focus") {
     const nowTs = Date.now();
     state.lastCapturedAtByUrl[url] = nowTs;
     state.url                      = url;
+    state.activeMsByUrl[url]       = 0;
+    if (state.activeUrl === url && state.activeSince) {
+      // Keep counting active view-time from this capture onward.
+      state.activeSince = nowTs;
+    }
 
     // Strip the data URL prefix to get raw base64 for DB storage
     const mhtmlBase64 = dataUrl.split(",")[1] || "";
@@ -391,6 +440,8 @@ async function onTabFocused(tabId) {
   const currentUrl = tab.url;
   const urlChanged = state.url !== currentUrl;
 
+  beginActiveTime(tabId, currentUrl, now);
+
   // Per-URL suppression window after bookmark-based captures
   const skipUntil = state.skipUntilByUrl[currentUrl] || null;
   if (skipUntil && now < skipUntil) {
@@ -398,12 +449,13 @@ async function onTabFocused(tabId) {
     return;
   }
 
-  // Decide if enough time has passed since the last capture of THIS URL in this tab.
-  const lastAtForUrl   = state.lastCapturedAtByUrl[currentUrl] || null;
-  const intervalElapsed = !lastAtForUrl || (now - lastAtForUrl) >= intervalMs;
+  // Decide if enough active-view time has elapsed for THIS URL in this tab.
+  const lastAtForUrl     = state.lastCapturedAtByUrl[currentUrl] || null;
+  const activeMsForUrl   = state.activeMsByUrl[currentUrl] || 0;
+  const intervalElapsed  = !lastAtForUrl || activeMsForUrl >= intervalMs;
 
   if (!intervalElapsed) {
-    console.log(`[PageArchiver] Skipped (interval not elapsed for URL): ${currentUrl}`);
+    console.log(`[PageArchiver] Skipped (active interval not elapsed for URL): ${currentUrl}`);
     return;
   }
 
@@ -417,13 +469,23 @@ async function onTabFocused(tabId) {
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
 // Tab becomes active in its window
-chrome.tabs.onActivated.addListener(({ tabId }) => {
+chrome.tabs.onActivated.addListener(({ tabId, previousTabId }) => {
+  if (previousTabId && previousTabId >= 0) {
+    flushActiveTime(previousTabId);
+  }
   onTabFocused(tabId);
 });
 
 // Window gains focus — capture the active tab in that window
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    // Browser lost focus — stop active-time accumulation for the focused tab.
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs && tabs[0];
+      if (activeTab) flushActiveTime(activeTab.id);
+    });
+    return;
+  }
   chrome.tabs.query({ active: true, windowId }, ([tab]) => {
     if (tab) onTabFocused(tab.id);
   });
@@ -433,18 +495,21 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
   if (!tab.active) return; // only care if it's the tab the user is looking at
+  flushActiveTime(tabId);
   onTabFocused(tabId);
 });
 
 // Tab closed — clean up state
 chrome.tabs.onRemoved.addListener((tabId) => {
+  flushActiveTime(tabId);
   clearDelayTimer(tabId);
   tabState.delete(tabId);
 });
 
-// ─── Bookmark created — fast-capture the active tab if URL matches ────────────
-// When a user bookmarks a page, capture it after 1s regardless of interval.
-// We find the tab showing that URL and bypass the normal delay/interval check.
+// ─── Bookmark created — immediate capture if URL matches ──────────────────────
+// When a user bookmarks a page, capture immediately (subject to active filters).
+// We find the matching tab and cancel any pending delayed auto-capture to avoid
+// duplicate downloads.
 
 chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
   if (!bookmark.url) return;
@@ -456,9 +521,10 @@ chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
     console.error("[PageArchiver] GitHub auto-clone error:", e);
   }
 
-  // Find any active tab showing this URL
-  chrome.tabs.query({ url: bookmark.url }, async (tabs) => {
-    if (!tabs || !tabs.length) return;
+  // Find tabs showing this URL (with a fallback equivalence check).
+  chrome.tabs.query({}, async (allTabs) => {
+    const tabs = (allTabs || []).filter(t => t.url && urlsEquivalent(t.url, bookmark.url));
+    if (!tabs.length) return;
 
     // Prefer the currently focused tab; fall back to first match
     const active = tabs.find(t => t.active) || tabs[0];
@@ -484,6 +550,11 @@ chrome.bookmarks.onCreated.addListener(async (_id, bookmark) => {
       const nowTs          = Date.now();
       state.lastCapturedAtByUrl[bookmark.url] = nowTs;
       state.skipUntilByUrl[bookmark.url]      = nowTs + intervalMs;
+      state.activeMsByUrl[bookmark.url]       = 0;
+      if (state.activeUrl && urlsEquivalent(state.activeUrl, bookmark.url)) {
+        state.activeUrl = bookmark.url;
+        state.activeSince = nowTs;
+      }
     } catch (e) {
       console.error("[PageArchiver] Bookmark capture failed:", e);
     }

@@ -25,13 +25,13 @@ Visited means saved. The page may disappear from the web tomorrow, the domain ma
 
 ## How it works
 
-Whenever you switch to a tab or return to the browser window, the extension checks whether enough time has passed **since that specific URL was last captured in that tab** (based on your configured interval). If yes, it waits your configured initial delay (to let the page finish loading), then captures.
+Whenever you switch to a tab or return to the browser window, the extension checks whether you have accumulated enough **active viewing time** on that specific URL in that tab (based on your configured interval). If yes, it waits your configured initial delay (to let the page finish loading), then captures.
 
 This means:
 
 - No captures happen while you are away from the browser.
-- Revisiting the **same URL in the same tab** after the interval elapses captures it again, picking up any changes.
-- Navigating within a site (e.g. `x.com` → `x.com/post/123` → `x.com`) tracks timing per URL: each distinct URL in a tab has its own capture timer. Going back to `x.com` does **not** force a new capture unless the interval for `https://x.com/` itself has elapsed.
+- Revisiting the **same URL in the same tab** captures again only after enough active viewing time on that URL has accumulated.
+- Navigating within a site (e.g. `x.com` → `x.com/post/123` → `x.com`) tracks timing per URL: each distinct URL in a tab has its own active-time counter. Going back to `x.com` does **not** force a new capture unless enough active time for `https://x.com/` has accumulated.
 - Switching tabs rapidly does not trigger a flood of captures — only the focused tab is eligible, and only after the interval for that URL in that tab.
 
 ---
@@ -76,7 +76,7 @@ All settings are in the popup. Changes take effect immediately — no restart ne
 | Setting | Default | Description |
 |---|---|---|
 | Silent downloads | On | When on, files save directly to `Downloads/page-archiver/` with no dialog. Turn off to choose the save location each time. For this to work, you must also disable **Ask where to save each file before downloading** in your browser's download settings (`brave://settings/downloads` or `chrome://settings/downloads`) — that browser-level setting overrides the extension. |
-| Capture interval | 5 min | Minimum time between captures of the same URL **per tab**. That URL must be focused again after this interval in a given tab for a new capture to trigger; visiting other URLs in between does not reset its timer. |
+| Capture interval | 5 min | Active viewing time required between captures of the same URL **per tab**. Time while the tab/page is not focused does not count. |
 | Initial delay | 10 sec | Time to wait after a tab is focused before capturing. Gives dynamic pages time to finish loading. Set to 0 to capture immediately. |
 | Save to SQLite | Off | When on, capture metadata is written to a real SQLite database via the native host. Requires running `install.py` first. |
 | Only archive bookmarks | Off | When on, only currently bookmarked pages are eligible for capture. Bookmarked pages still follow the active site filter and root-page rules. |
