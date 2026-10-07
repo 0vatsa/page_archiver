@@ -8,6 +8,8 @@
 //     the page, and only if the configured active-time interval has elapsed
 //     for that URL.
 
+import { evaluateFilter, FILTER_SETTING_KEYS } from "./lib/filter.js";
+
 const HOST_NAME = "com.page_archiver.host";
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -117,6 +119,25 @@ function notify(title, message) {
   } catch (e) {
     console.warn("[PageArchiver] Notification failed:", e);
   }
+}
+
+// ─── Toolbar badge ─────────────────────────────────────────────────────────────
+// Presentational only: marks the tab once its current page has been archived.
+// Cleared when the tab starts loading a new page.
+
+const BADGE_COLOR = "#2F7D4F";
+
+function markTabArchived(tabId) {
+  const ignore = () => {}; // tab may have closed in the meantime
+  chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE_COLOR }).catch(ignore);
+  chrome.action.setBadgeText({ tabId, text: "✓" }).catch(ignore);
+  chrome.action.setTitle({ tabId, title: "Page Archiver — this page is archived" }).catch(ignore);
+}
+
+function clearTabBadge(tabId) {
+  const ignore = () => {};
+  chrome.action.setBadgeText({ tabId, text: "" }).catch(ignore);
+  chrome.action.setTitle({ tabId, title: "Page Archiver" }).catch(ignore);
 }
 
 // ─── Native messaging ─────────────────────────────────────────────────────────
@@ -270,24 +291,13 @@ async function maybeCloneGithubRepo(url) {
 }
 
 // ─── Filter check ─────────────────────────────────────────────────────────────
-// Returns { allowed: bool, reason: string }
+// Returns { allowed: bool, reason: string }. Rules live in lib/filter.js so the
+// popup can explain decisions with the same logic.
 
 async function shouldCapture(url, options = {}) {
-  const {
-    filterMode      = "none",
-    filterSites     = [],
-    onlyBookmarks   = false,
-    ignoreRootPages = false,
-  } = await getSetting(["filterMode", "filterSites", "onlyBookmarks", "ignoreRootPages"]);
+  const settings = await getSetting(FILTER_SETTING_KEYS);
 
-  let hostname, pathname;
-  try {
-    const parsed = new URL(url);
-    hostname = parsed.hostname.toLowerCase();
-    pathname = parsed.pathname;
-  } catch { return { allowed: true }; }
-
-  const isRoot = pathname === "/" || pathname === "";
+  try { new URL(url); } catch { return { allowed: true }; }
 
   // Check if currently bookmarked. For immediate bookmark events, we can trust
   // the event payload even if chrome.bookmarks.search has not indexed yet.
@@ -295,48 +305,7 @@ async function shouldCapture(url, options = {}) {
     ? true
     : await isBookmarked(url);
 
-  // If onlyBookmarks toggle is on and page is NOT bookmarked, skip
-  if (onlyBookmarks && !bookmarked) return { allowed: false, reason: "only-bookmarks" };
-
-  // Normalise filter site entries
-  const entries = filterSites.map(e =>
-    typeof e === "string"
-      ? { host: e.toLowerCase(), stemOnly: false }
-      : { host: e.host.toLowerCase(), stemOnly: !!e.stemOnly }
-  );
-
-  // Find if this hostname is explicitly listed
-  const listed = entries.find(({ host }) =>
-    hostname === host || hostname.endsWith("." + host)
-  );
-
-  if (filterMode === "allow") {
-    if (!listed) return { allowed: false, reason: "not-in-allowlist" };
-    // Listed in allow — stemOnly applies
-    if (listed.stemOnly && isRoot) return { allowed: false, reason: "stem-only" };
-    return { allowed: true };
-  }
-
-  if (filterMode === "block") {
-    if (listed) {
-      // stemOnly: block root only, allow subpages
-      if (listed.stemOnly) {
-        return isRoot
-          ? { allowed: false, reason: "stem-block" }
-          : { allowed: true };
-      }
-      return { allowed: false, reason: "blocked" };
-    }
-    // Not explicitly listed — apply global ignoreRootPages if enabled
-    if (ignoreRootPages && isRoot) return { allowed: false, reason: "ignore-root" };
-    return { allowed: true };
-  }
-
-  // filterMode === "none"
-  // No list active — still apply global ignoreRootPages for unlisted sites
-  if (ignoreRootPages && isRoot) return { allowed: false, reason: "ignore-root" };
-
-  return { allowed: true };
+  return evaluateFilter(url, settings, bookmarked);
 }
 
 // ─── Core capture ─────────────────────────────────────────────────────────────
@@ -410,6 +379,8 @@ async function captureAndSave(tabId, trigger = "focus") {
 
     dbRecordSnapshot({ url, title, filename, capturedAt, sizeBytes, trigger, mhtmlBase64 })
       .catch(e => console.error("[PageArchiver] DB write failed:", e.message));
+
+    markTabArchived(tabId);
 
     console.log(`[PageArchiver] Captured (${trigger}): ${url}`);
     return { success: true, filename };
@@ -499,6 +470,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   onTabFocused(tabId);
 });
 
+// New page starting to load — the archived badge no longer applies
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "loading" && changeInfo.url) clearTabBadge(tabId);
+});
+
 // Tab closed — clean up state
 chrome.tabs.onRemoved.addListener((tabId) => {
   flushActiveTime(tabId);
@@ -567,6 +543,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "GET_STATS") {
     dbGetStats().then(sendResponse).catch(e => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
+  if (message.type === "GET_TAB_STATUS") {
+    // Read-only view of per-tab timing state for the popup. Never mutates state.
+    getConfig().then(({ intervalMs, delayMs }) => {
+      const state = tabState.get(message.tabId);
+      const url   = message.url;
+      if (!state || !url) {
+        sendResponse({ ok: true, known: false, intervalMs, delayMs });
+        return;
+      }
+      const now = Date.now();
+      let activeMs = state.activeMsByUrl[url] || 0;
+      if (state.activeUrl === url && state.activeSince) {
+        activeMs += Math.max(0, now - state.activeSince);
+      }
+      sendResponse({
+        ok:             true,
+        known:          true,
+        intervalMs,
+        delayMs,
+        lastCapturedAt: state.lastCapturedAtByUrl[url] || null,
+        activeMs,
+        pending:        !!state.delayTimer && state.activeUrl === url,
+        skipUntil:      state.skipUntilByUrl[url] || null,
+      });
+    }).catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
   }
 

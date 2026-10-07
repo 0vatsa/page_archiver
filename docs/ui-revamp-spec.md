@@ -1,6 +1,13 @@
 # Page Archiver — UI Revamp Spec
 
-Status: Draft · Scope: **presentation layer only** · Owner: TBD
+Status: **Implemented** · Scope: **presentation layer only**
+
+> **Decisions (§11):** rust accent and icon redraw approved; read-only `GET_TAB_STATUS` and the toolbar badge approved; `favicon` permission approved; Options page opens as a full tab; plain JavaScript only (ES modules, no build step, no Node/npm dependencies).
+>
+> **Notes from implementation:**
+> - The popup keeps the original behaviour of switching back to browser storage when SQLite is selected but the helper app is unreachable. It now reports this in the header ("Storage issue") instead of doing it silently.
+> - The original "Initial delay" field turned `0` into `10` (`parseInt(v) || 10`), so "capture immediately" could never be saved. The new stepper saves `0` as documented. Clamps are otherwise unchanged.
+> - In headless-Chromium testing, focus-triggered auto-capture fails intermittently (about 1 in 3 runs) with both the original and the new `background.js`. That's the untouched capture path, so it's listed in §12.
 
 This spec covers the visual and interaction redesign of the extension's UI. **No capture behavior, filter logic, storage schema or native-host protocol changes are made in this phase.** Functional changes are listed in [§12 Deferred](#12-deferred-to-the-functionality-session) for the next session.
 
@@ -397,6 +404,7 @@ Noted during the audit. **Not** to be done in this phase:
 - Local-storage DB grows unbounded in `chrome.storage.local` (no quota handling); stats `mb` semantics differ between local and native modes.
 - Incognito / private window policy.
 - Notifications for capture failures (currently only GitHub clone notifies).
+- Focus-triggered auto-capture intermittently produces no file in headless Chromium: the delay timer fires but nothing is written, and `captureAndSave` swallows the error into the worker console. This happens with the pre-revamp code too. Investigate whether `pageCapture` runs too early, and surface the failure in the UI.
 
 ---
 

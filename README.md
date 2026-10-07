@@ -62,32 +62,38 @@ python3 install.py --uninstall
 
 After installing the native host:
 
-- Open the extension popup and toggle **Save to SQLite** on. The popup will confirm the connection and show the path to your `.db` file.
-- Optionally toggle **Clone bookmarked GitHub repos** on to enable automatic `git clone` whenever you bookmark a GitHub repository.
+- Open **Settings → Storage** (gear icon in the popup) and choose **SQLite database**. The page confirms the connection and shows the path to your `.db` file. If the helper app isn't reachable, it shows the setup steps, with your extension ID ready to copy.
+- Optionally turn on **Settings → Integrations → Clone GitHub repos when bookmarked** to enable automatic `git clone` whenever you bookmark a GitHub repository.
 
 GitHub repositories are cloned into the directory you chose during `install.py` (default: `~/Downloads/page-archiver/github_repos`). Each repo is placed in a subfolder named `<owner>__<repo>`. If a repo has already been cloned, bookmarking it again will not reclone it; you’ll get a notification that it already exists.
 
 ---
 
-## Settings
+## Using the extension
 
-All settings are in the popup. Changes take effect immediately — no restart needed.
+**Popup** (toolbar icon). Shows the current page: whether it's archived, and if not, why (for example "localhost is on your block list"), with a one-click fix. It also has **Archive now**, your archive totals and a searchable list of recently archived pages. A ✓ badge on the toolbar icon means the current page has been archived.
+
+**Settings** (gear icon in the popup, or right-click the toolbar icon → *Options*) opens a full page with five sections: Capture, What to archive, Storage, Integrations and About. Changes save automatically and take effect immediately, with no restart needed.
+
+---
+
+## Settings
 
 | Setting | Default | Description |
 |---|---|---|
-| Silent downloads | On | When on, files save directly to `Downloads/page-archiver/` with no dialog. Turn off to choose the save location each time. For this to work, you must also disable **Ask where to save each file before downloading** in your browser's download settings (`brave://settings/downloads` or `chrome://settings/downloads`) — that browser-level setting overrides the extension. |
-| Capture interval | 5 min | Active viewing time required between captures of the same URL **per tab**. Time while the tab/page is not focused does not count. |
-| Initial delay | 10 sec | Time to wait after a tab is focused before capturing. Gives dynamic pages time to finish loading. Set to 0 to capture immediately. |
-| Save to SQLite | Off | When on, capture metadata is written to a real SQLite database via the native host. Requires running `install.py` first. |
-| Only archive bookmarks | Off | When on, only currently bookmarked pages are eligible for capture. Bookmarked pages still follow the active site filter and root-page rules. |
-| Ignore root pages | Off | When on, root domain pages (e.g. `example.com/`) are skipped globally. Does not apply to sites explicitly listed in the block/allow list — those use the per-site stem only toggle instead. |
-| Clone bookmarked GitHub repos | Off | When on, bookmarking a `github.com/owner/repo` URL automatically asks the native host to `git clone` that repository into your configured clone directory. Requires the native host to be installed and `git` available on your PATH. |
+| Save without asking | On | When on, files save directly to `Downloads/page-archiver/` with no dialog. Turn off to choose the save location each time. For this to work, you must also disable **Ask where to save each file before downloading** in your browser's download settings (`brave://settings/downloads` or `chrome://settings/downloads`) — that browser-level setting overrides the extension. |
+| Re-archive a page after | 5 min | Active viewing time required between captures of the same URL **per tab**. Time while the tab/page is not focused does not count. |
+| Wait for the page to load | 10 sec | Time to wait after a tab is focused before capturing. Gives dynamic pages time to finish loading. Set to 0 to capture immediately. |
+| Storage: SQLite database | Off | When on, capture metadata is written to a real SQLite database via the native host. Requires running `install.py` first. |
+| Only bookmarked pages | Off | When on, only currently bookmarked pages are eligible for capture. Bookmarked pages still follow the active site filter and root-page rules. |
+| Skip home pages | Off | When on, root domain pages (e.g. `example.com/`) are skipped globally. Does not apply to sites explicitly listed in the block/allow list — those use the per-site **Home page only** toggle instead. |
+| Clone GitHub repos when bookmarked | Off | When on, bookmarking a `github.com/owner/repo` URL automatically asks the native host to `git clone` that repository into your configured clone directory. Requires the native host to be installed and `git` available on your PATH. |
 
 ---
 
 ## Additional capture filters
 
-### Only archive bookmarks
+### Only bookmarked pages
 
 When this toggle is **on**, only currently bookmarked pages are eligible for capture. Non-bookmarked pages are skipped.
 
@@ -97,17 +103,17 @@ In both cases, bookmarked pages still follow your active filter mode (off/block/
 
 **Bookmark capture delay:** when you bookmark a page for the first time, the extension detects the new bookmark and captures that page after 1 second, bypassing both the normal initial delay and the interval check. This ensures the page is archived immediately at the moment of bookmarking. Subsequent revisits to the same bookmarked page follow the normal delay and interval rules.
 
-### Ignore root pages
+### Skip home pages
 
 When on, pages at the root of a domain (e.g. `example.com/`, `example.com`) are skipped globally. Subpages like `example.com/article/123` are still captured.
 
-This only applies to sites that are not explicitly listed in your block or allow list. For listed sites, the per-site **stem only** toggle takes precedence over this global setting.
+This only applies to sites that are not explicitly listed in your block or allow list. For listed sites, the per-site **Home page only** toggle takes precedence over this global setting.
 
 The interaction between all filter settings in order of precedence:
 
 1. If "only bookmarks" is on and page is not bookmarked → skip
-2. If the site is in the allow list → capture unless stem only is on and it is a root page
-3. If the site is in the block list → skip unless stem only is on and it is a subpage
+2. If the site is in the allow list → capture unless Home page only is on and it is a root page
+3. If the site is in the block list → skip unless Home page only is on and it is a subpage
 4. If the site is not in any list and "ignore root pages" is on → skip root pages, capture subpages
 5. Otherwise → capture
 
@@ -115,11 +121,11 @@ The interaction between all filter settings in order of precedence:
 
 ## Site filter
 
-The filter panel has three modes, mutually exclusive:
+**Settings → What to archive → Site list** has three modes, mutually exclusive:
 
 **Off** — no filtering, all pages are captured.
 
-**Block list** — capture everything except the domains you add. Each entry in the block list has a **stem only** toggle. With stem only off (default), the entire domain is blocked including all paths. With stem only on, only the root URL (`domain.com/`) is blocked — subpages like `domain.com/home` are still captured.
+**Block list** — capture everything except the domains you add. Each entry in the block list has a **Home page only** toggle. With it off (default), the entire domain is blocked including all paths. With it on, only the root URL (`domain.com/`) is blocked — subpages like `domain.com/home` are still captured.
 
 **Allow list** — capture only the domains you add. Subdomains are matched automatically: adding `github.com` also covers `gist.github.com`.
 
@@ -246,6 +252,7 @@ Logs are written to `_sqlitedb/host.log` (same directory as the database).
 | `nativeMessaging` | Talk to the SQLite host process (only used if SQLite is enabled) |
 | `bookmarks` | Check whether pages are bookmarked for the "only bookmarks" filter, and (optionally) trigger GitHub repo cloning when a repo URL is bookmarked |
 | `notifications` | Show success/failure notifications for captures and GitHub clone operations |
+| `favicon` | Show site icons in the popup's recent list and the site list |
 
 ---
 
@@ -258,6 +265,6 @@ The website or server cannot detect that a capture occurred. `pageCapture` reads
 ## Notes
 
 - `chrome://`, `chrome-extension://`, and `about:` pages are skipped.
-- Clearing the DB from the popup removes log records only — already-downloaded `.mhtml` files are not deleted.
+- **Settings → Storage → Clear archive log** removes log records only. Already-downloaded `.mhtml` files are not deleted. In SQLite mode this also deletes the page copies stored in the database.
 - On Windows, the native host installer writes a `.bat` wrapper alongside the Python script, since Chrome's native messaging requires a directly executable file path.
 - If the SQLite toggle is turned on but the native host is unreachable, the toggle reverts automatically and the extension falls back to `chrome.storage.local`.

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page Archiver settings</title>
+  <link rel="icon" href="icons/icon-32.png" />
+  <link rel="stylesheet" href="ui/tokens.css" />
+  <link rel="stylesheet" href="ui/components.css" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="icons/icon-48.png" alt="" width="28" height="28" />
+      <div>
+        <div class="brand-name">Page Archiver</div>
+        <div class="brand-sub subtle" id="version"></div>
+      </div>
+    </div>
+    <nav aria-label="Settings sections">
+      <a href="#capture"      data-section="capture"><span data-icon="clock"></span>Capture</a>
+      <a href="#filters"      data-section="filters"><span data-icon="filter"></span>What to archive</a>
+      <a href="#storage"      data-section="storage"><span data-icon="database"></span>Storage</a>
+      <a href="#integrations" data-section="integrations"><span data-icon="git"></span>Integrations</a>
+      <a href="#about"        data-section="about"><span data-icon="info"></span>About</a>
+    </nav>
+  </aside>
+
+  <main id="main" tabindex="-1">
+
+    <!-- ── Capture ─────────────────────────────────────────────────────── -->
+    <section class="panel" id="panel-capture" data-section="capture" aria-labelledby="h-capture">
+      <h1 id="h-capture">Capture</h1>
+      <p class="lede">When pages are saved, and how files are written.</p>
+
+      <div class="group card">
+        <div class="row row-stack">
+          <div class="row-text">
+            <div class="row-label" id="lbl-interval">Re-archive a page after</div>
+            <div class="row-help" id="help-interval">Counts only time you're actively viewing that page in a tab. Switching away pauses the clock.</div>
+          </div>
+          <div class="row-control">
+            <div class="segmented" role="radiogroup" id="interval-presets" aria-labelledby="lbl-interval" aria-describedby="help-interval">
+              <button type="button" role="radio" data-value="1">1 min</button>
+              <button type="button" role="radio" data-value="5">5 min</button>
+              <button type="button" role="radio" data-value="15">15 min</button>
+              <button type="button" role="radio" data-value="30">30 min</button>
+              <button type="button" role="radio" data-value="60">1 hr</button>
+              <button type="button" role="radio" data-value="custom">Custom</button>
+            </div>
+            <span class="saved" data-saved="interval" aria-live="polite"></span>
+          </div>
+          <div class="custom-interval" id="custom-interval" hidden>
+            <div class="stepper" data-min="1" data-max="1440">
+              <button type="button" data-step="-1" aria-label="Decrease minutes">−</button>
+              <input class="input" type="number" id="input-interval" min="1" max="1440" inputmode="numeric" aria-labelledby="lbl-interval" aria-describedby="err-interval" />
+              <button type="button" data-step="1" aria-label="Increase minutes">+</button>
+              <span class="unit">minutes</span>
+            </div>
+            <div class="field-error" id="err-interval" hidden></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-text">
+            <label class="row-label" for="input-delay">Wait for the page to load</label>
+            <div class="row-help" id="help-delay">Gives dynamic pages time to finish loading before saving. 0 saves immediately.</div>
+            <div class="field-error" id="err-delay" hidden></div>
+          </div>
+          <div class="row-control">
+            <span class="saved" data-saved="delay" aria-live="polite"></span>
+            <div class="stepper" data-min="0" data-max="120">
+              <button type="button" data-step="-1" aria-label="Decrease seconds">−</button>
+              <input class="input" type="number" id="input-delay" min="0" max="120" inputmode="numeric" aria-describedby="help-delay err-delay" />
+              <button type="button" data-step="1" aria-label="Increase seconds">+</button>
+              <span class="unit">sec</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-text">
+            <div class="row-label" id="lbl-silent">Save without asking</div>
+            <div class="row-help" id="help-silent">Files go straight to <code>Downloads/page-archiver</code>. Turn off to choose a location for every copy.</div>
+          </div>
+          <div class="row-control">
+            <span class="saved" data-saved="silent" aria-live="polite"></span>
+            <button type="button" class="switch" role="switch" id="sw-silent" aria-labelledby="lbl-silent" aria-describedby="help-silent"></button>
+          </div>
+          <div class="banner warning row-banner" id="silent-note">
+            <span data-icon="alert"></span>
+            <div>
+              Your browser's <strong>Ask where to save each file</strong> setting overrides this. Turn it off for silent saving to work.
+              <div><button type="button" class="btn-link" id="btn-browser-downloads">Open browser download settings</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── What to archive ─────────────────────────────────────────────── -->
+    <section class="panel" id="panel-filters" data-section="filters" aria-labelledby="h-filters" hidden>
+      <h1 id="h-filters">What to archive</h1>
+      <p class="lede">By default every page you spend time on is archived. Narrow it down here.</p>
+
+      <div class="group card">
+        <div class="row">
+          <div class="row-text">
+            <div class="row-label" id="lbl-bookmarks">Only bookmarked pages</div>
+            <div class="row-help" id="help-bookmarks">Skip pages that aren't in your bookmarks. New bookmarks are archived right away.</div>
+          </div>
+          <div class="row-control">
+            <span class="saved" data-saved="bookmarks" aria-live="polite"></span>
+            <button type="button" class="switch" role="switch" id="sw-bookmarks" aria-labelledby="lbl-bookmarks" aria-describedby="help-bookmarks"></button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text">
+            <div class="row-label" id="lbl-root">Skip home pages</div>
+            <div class="row-help" id="help-root">Skip pages like <code>example.com/</code> but keep <code>example.com/article</code>. Sites in your list below use their own setting.</div>
+          </div>
+          <div class="row-control">
+            <span class="saved" data-saved="root" aria-live="polite"></span>
+            <button type="button" class="switch" role="switch" id="sw-root" aria-labelledby="lbl-root" aria-describedby="help-root"></button>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="group-title">Site list</h2>
+      <div class="group card">
+        <div class="row row-stack">
+          <div class="row-control">
+            <div class="segmented" role="radiogroup" id="filter-mode" aria-label="Site list mode">
+              <button type="button" role="radio" data-value="none">Off</button>
+              <button type="button" role="radio" data-value="block">Block list</button>
+              <button type="button" role="radio" data-value="allow">Allow list</button>
+            </div>
+            <span class="saved" data-saved="mode" aria-live="polite"></span>
+          </div>
+          <div class="row-help" id="mode-help"></div>
+        </div>
+
+        <form class="add-site" id="add-site" novalidate>
+          <label class="sr-only" for="site-input">Add a site</label>
+          <input class="input" type="text" id="site-input" placeholder="Add a site, e.g. twitter.com or paste a URL"
+                 autocomplete="off" spellcheck="false" aria-describedby="err-site" />
+          <button class="btn btn-secondary" type="submit"><span data-icon="plus"></span>Add</button>
+        </form>
+        <div class="field-error add-site-error" id="err-site" hidden></div>
+
+        <div id="undo-slot" aria-live="polite"></div>
+        <ul class="site-list" id="site-list" aria-label="Sites"></ul>
+      </div>
+
+      <details class="explainer card">
+        <summary><span data-icon="info"></span>How these rules combine</summary>
+        <ol>
+          <li>If <strong>Only bookmarked pages</strong> is on and the page isn't bookmarked, it's skipped.</li>
+          <li>On an <strong>allow list</strong>, only listed sites are archived (their subdomains too).</li>
+          <li>On a <strong>block list</strong>, listed sites are skipped — unless the site is set to <strong>Home page only</strong>, in which case only its home page is skipped.</li>
+          <li>For sites not in your list, <strong>Skip home pages</strong> skips <code>example.com/</code> but keeps deeper pages.</li>
+          <li>Everything else is archived.</li>
+        </ol>
+        <p class="subtle">Manual “Archive now” follows the same rules.</p>
+      </details>
+    </section>
+
+    <!-- ── Storage ─────────────────────────────────────────────────────── -->
+    <section class="panel" id="panel-storage" data-section="storage" aria-labelledby="h-storage" hidden>
+      <h1 id="h-storage">Storage</h1>
+      <p class="lede">Every copy is saved as an <code>.mhtml</code> file. Choose where the log of captures is kept.</p>
+
+      <div class="choice-cards" role="radiogroup" id="storage-mode" aria-label="Where captures are recorded">
+        <button type="button" role="radio" class="choice card" data-value="local">
+          <span class="choice-radio" aria-hidden="true"></span>
+          <span class="choice-body">
+            <span class="choice-title">Browser storage</span>
+            <span class="choice-desc">Simple, no setup. Keeps a log of captures inside the browser.</span>
+          </span>
+        </button>
+        <button type="button" role="radio" class="choice card" data-value="native">
+          <span class="choice-radio" aria-hidden="true"></span>
+          <span class="choice-body">
+            <span class="choice-title">SQLite database <span class="pill">Advanced</span></span>
+            <span class="choice-desc">A queryable database on your disk that also stores a full copy of each page. Needs the helper app.</span>
+          </span>
+        </button>
+      </div>
+      <span class="saved" data-saved="storage" aria-live="polite"></span>
+
+      <div id="host-status" class="host-status" aria-live="polite"></div>
+
+      <div class="card setup" id="setup-panel" hidden>
+        <h2>Set up the helper app</h2>
+        <ol class="steps">
+          <li>
+            <div>Copy your extension ID</div>
+            <div class="copy-field"><code id="ext-id"></code><button type="button" class="btn btn-secondary" data-copy="#ext-id"><span data-icon="copy"></span>Copy</button></div>
+          </li>
+          <li>
+            <div>In the extension folder, run the installer and paste the ID when asked</div>
+            <div class="copy-field"><code id="install-cmd">cd native-host &amp;&amp; python3 install.py</code><button type="button" class="btn btn-secondary" data-copy="#install-cmd"><span data-icon="copy"></span>Copy</button></div>
+          </li>
+          <li>
+            <div>Restart your browser, then check again</div>
+            <div><button type="button" class="btn btn-primary" id="btn-check-host"><span data-icon="refresh"></span>Check again</button></div>
+          </li>
+        </ol>
+      </div>
+
+      <h2 class="group-title danger-title">Danger zone</h2>
+      <div class="group card danger-zone">
+        <div class="row">
+          <div class="row-text">
+            <div class="row-label">Clear archive log</div>
+            <div class="row-help" id="clear-help"></div>
+          </div>
+          <div class="row-control">
+            <button type="button" class="btn btn-danger-outline" id="btn-clear"><span data-icon="trash"></span>Clear log…</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Integrations ────────────────────────────────────────────────── -->
+    <section class="panel" id="panel-integrations" data-section="integrations" aria-labelledby="h-integrations" hidden>
+      <h1 id="h-integrations">Integrations</h1>
+      <p class="lede">Extra actions that run through the helper app.</p>
+
+      <div class="group card">
+        <div class="row">
+          <div class="row-text">
+            <div class="row-label" id="lbl-github">Clone GitHub repos when bookmarked</div>
+            <div class="row-help" id="help-github">Bookmarking <code>github.com/owner/repo</code> clones it into the folder you chose during setup. Needs the helper app and <code>git</code>.</div>
+          </div>
+          <div class="row-control">
+            <span class="saved" data-saved="github" aria-live="polite"></span>
+            <button type="button" class="switch" role="switch" id="sw-github" aria-labelledby="lbl-github" aria-describedby="help-github github-note"></button>
+          </div>
+          <div class="row-banner" id="github-note"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── About ───────────────────────────────────────────────────────── -->
+    <section class="panel prose" id="panel-about" data-section="about" aria-labelledby="h-about" hidden>
+      <h1 id="h-about">About</h1>
+      <p class="lede"><strong>Visited means saved.</strong></p>
+      <p>The web isn't a library. Links rot, pages change, and whole sites disappear when nobody pays the hosting bill. Page Archiver keeps your own copy of the pages you actually read — the exact page as it appeared in your browser — as a self-contained <code>.mhtml</code> file on your disk.</p>
+      <p>No cloud service, no third-party archive. Your copies stay on your computer, under your control.</p>
+
+      <h2>Privacy</h2>
+      <p>Captures read what's already loaded in your browser. No extra requests are made to the site, and nothing leaves your computer.</p>
+
+      <h2>Permissions</h2>
+      <table class="perm-table">
+        <tbody>
+          <tr><th scope="row">Page capture</th><td>Save the page you're viewing as an <code>.mhtml</code> file</td></tr>
+          <tr><th scope="row">Downloads</th><td>Write those files to your Downloads folder</td></tr>
+          <tr><th scope="row">Tabs</th><td>Notice when you switch to a tab or a page finishes loading</td></tr>
+          <tr><th scope="row">Storage</th><td>Remember your settings and the capture log</td></tr>
+          <tr><th scope="row">Scripting</th><td>Detect when dynamic pages have settled</td></tr>
+          <tr><th scope="row">Bookmarks</th><td>Archive pages when you bookmark them, and support “Only bookmarked pages”</td></tr>
+          <tr><th scope="row">Native messaging</th><td>Talk to the optional SQLite helper app</td></tr>
+          <tr><th scope="row">Notifications</th><td>Tell you when a GitHub clone succeeds or fails</td></tr>
+          <tr><th scope="row">Favicons</th><td>Show site icons in your recent pages</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<dialog class="dialog" id="clear-dialog" aria-labelledby="clear-title" aria-describedby="clear-body">
+  <h2 id="clear-title">Clear archive log?</h2>
+  <div id="clear-body"></div>
+  <div class="actions">
+    <button type="button" class="btn btn-secondary" id="btn-clear-cancel">Cancel</button>
+    <button type="button" class="btn btn-danger" id="btn-clear-confirm">Clear log</button>
+  </div>
+</dialog>
+
+<script type="module" src="options.js"></script>
+</body>
+</html>
