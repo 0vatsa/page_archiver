@@ -282,7 +282,7 @@ The accent is a proposal; see §11. Every text/background pair must be validated
 | Meta | 12/400/16 |
 | Overline (section label) | 11/600/14, +0.04em tracking, uppercase, `--text-3` |
 
-Minimum size is 12px (the current UI uses 10px in many places).
+Minimum size is 12px, except the uppercase 11px overline (the current UI uses 10px in many places).
 
 **Spacing**: 4px grid (4, 8, 12, 16, 20, 24). Popup gutters 16px.
 **Radius**: 6px controls, 10px cards, 999px pills.
