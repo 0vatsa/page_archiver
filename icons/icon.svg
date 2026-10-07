@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Page Archiver mark: archive box with a down arrow on a rust tile. -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#B4531B"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 22v32"/>
+    <path d="M50 41l14 14 14-14"/>
+    <rect x="26" y="64" width="76" height="16" rx="4"/>
+    <path d="M32 80v18a6 6 0 0 0 6 6h52a6 6 0 0 0 6-6V80"/>
+    <path d="M56 92h16"/>
+  </g>
+</svg>
